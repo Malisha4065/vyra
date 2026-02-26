@@ -17,6 +17,7 @@
     "dependencies": {
         "@inertiajs/vue3": "^2.3.16",
         "@vitejs/plugin-vue": "^6.0.4",
-        "vue": "^3.5.29"
+        "vue": "^3.5.29",
+        "ziggy-js": "^2.6.1"
     }
 }
