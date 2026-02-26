@@ -47,6 +47,23 @@ class EloquentPostRepository implements PostRepositoryInterface
             ->find($id);
     }
 
+    public function findByIds(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $orderMap = array_flip($ids);
+
+        return $this->postModel
+            ->with(['author.profile', 'media', 'comments.author.profile', 'reactions'])
+            ->whereIn('id', $ids)
+            ->get()
+            ->sortBy(static fn (Post $post): int => $orderMap[$post->id] ?? PHP_INT_MAX)
+            ->values()
+            ->all();
+    }
+
     public function updateBody(Post $post, string $body): Post
     {
         $post->update([

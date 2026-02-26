@@ -13,6 +13,12 @@ interface PostRepositoryInterface
 
     public function findById(string $id): ?Post;
 
+    /**
+     * @param array<int, string> $ids
+     * @return array<int, Post>
+     */
+    public function findByIds(array $ids): array;
+
     public function updateBody(Post $post, string $body): Post;
 
     public function delete(Post $post): void;
