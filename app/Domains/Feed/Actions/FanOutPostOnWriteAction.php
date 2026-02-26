@@ -3,6 +3,7 @@
 namespace App\Domains\Feed\Actions;
 
 use App\Domains\Feed\Data\FanOutPostOnWriteData;
+use App\Domains\Feed\Jobs\PushPostToFollowersChunkJob;
 use App\Domains\Feed\Repositories\FeedCacheRepositoryInterface;
 use App\Domains\Feed\Repositories\HybridFeedRepositoryInterface;
 use App\Domains\Feed\ValueObjects\FeedFanOutThreshold;
@@ -21,7 +22,7 @@ class FanOutPostOnWriteAction
      */
     public function __invoke(FanOutPostOnWriteData $data): string
     {
-        $this->feedCacheRepository->addPostToUserFeed($data->author_id, $data->post_id, $data->published_at);
+        $this->feedCacheRepository->addPostToUserFeedIfAbsent($data->author_id, $data->post_id, $data->published_at);
 
         $followersCount = $this->followRepository->followersCount($data->author_id);
 
@@ -37,10 +38,11 @@ class FanOutPostOnWriteAction
         }
 
         $this->hybridFeedRepository->unmarkAuthorAsHighFollower($data->author_id);
-
-        $followerIds = $this->followRepository->getFollowerIds($data->author_id);
-
-        $this->feedCacheRepository->addPostToUserFeeds($followerIds, $data->post_id, $data->published_at);
+        PushPostToFollowersChunkJob::dispatch(
+            postId: $data->post_id,
+            authorId: $data->author_id,
+            score: $data->published_at,
+        )->onQueue('feed');
 
         return 'fanout';
     }

@@ -2,6 +2,8 @@
 
 namespace App\Domains\SocialGraph\Jobs;
 
+use App\Domains\Notification\Actions\CreateUserNotificationAction;
+use App\Domains\Notification\Data\CreateUserNotificationData;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -15,8 +17,17 @@ class DispatchFollowRequestAcceptedNotificationJob implements ShouldQueue
         public readonly string $requesteeId,
     ) {}
 
-    public function handle(): void
+    public function handle(CreateUserNotificationAction $createNotificationAction): void
     {
-        // Notification fan-out will be implemented in Notification domain.
+        $createNotificationAction(CreateUserNotificationData::from([
+            'user_id' => $this->requesterId,
+            'type' => 'social.follow_request_accepted',
+            'title' => 'Follow request accepted',
+            'body' => 'Your follow request was accepted.',
+            'data' => [
+                'request_id' => $this->requestId,
+                'actor_user_id' => $this->requesteeId,
+            ],
+        ]));
     }
 }

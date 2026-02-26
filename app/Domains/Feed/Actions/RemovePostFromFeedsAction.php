@@ -3,6 +3,7 @@
 namespace App\Domains\Feed\Actions;
 
 use App\Domains\Feed\Data\RemovePostFromFeedsData;
+use App\Domains\Feed\Jobs\RemovePostFromFollowersChunkJob;
 use App\Domains\Feed\Repositories\FeedCacheRepositoryInterface;
 use App\Domains\Feed\Repositories\HybridFeedRepositoryInterface;
 use App\Domains\Feed\ValueObjects\FeedFanOutThreshold;
@@ -28,7 +29,9 @@ class RemovePostFromFeedsAction
             return;
         }
 
-        $followerIds = $this->followRepository->getFollowerIds($data->author_id);
-        $this->feedCacheRepository->removePostFromUserFeeds($followerIds, $data->post_id);
+        RemovePostFromFollowersChunkJob::dispatch(
+            postId: $data->post_id,
+            authorId: $data->author_id,
+        )->onQueue('feed');
     }
 }

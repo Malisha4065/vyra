@@ -78,4 +78,18 @@ class EloquentFollowRepository implements FollowRepositoryInterface
             ->pluck('followee_id')
             ->all();
     }
+
+    public function getFollowerIdsChunk(string $userId, ?string $afterFollowerId = null, int $limit = 1000): array
+    {
+        $query = $this->model
+            ->where('followee_id', $userId)
+            ->orderBy('follower_id')
+            ->limit($limit);
+
+        if ($afterFollowerId !== null) {
+            $query->where('follower_id', '>', $afterFollowerId);
+        }
+
+        return $query->pluck('follower_id')->all();
+    }
 }

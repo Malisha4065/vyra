@@ -6,6 +6,7 @@ use App\Http\Controllers\Identity\LoginController;
 use App\Http\Controllers\Identity\LogoutController;
 use App\Http\Controllers\Identity\ProfileController;
 use App\Http\Controllers\Identity\RegisterController;
+use App\Http\Controllers\Notification\NotificationController;
 use App\Http\Controllers\Content\PostController;
 use App\Http\Controllers\Content\PostReactionController;
 use App\Http\Controllers\SocialGraph\BlockController;
@@ -72,4 +73,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/posts/{post}/reactions', [PostReactionController::class, 'store'])->name('posts.reactions.store');
     Route::delete('/posts/{post}/reactions', [PostReactionController::class, 'destroy'])->name('posts.reactions.destroy');
     Route::get('/posts/{post}/reactions/summary', [PostReactionController::class, 'summary'])->name('posts.reactions.summary');
+
+    // Notifications
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::put('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+    Route::put('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
 });

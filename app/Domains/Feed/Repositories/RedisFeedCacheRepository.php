@@ -17,6 +17,20 @@ class RedisFeedCacheRepository implements FeedCacheRepositoryInterface
         Redis::zremrangebyrank($key, 0, -1 * (self::FEED_MAX_ITEMS + 1));
     }
 
+    public function addPostToUserFeedIfAbsent(string $userId, string $postId, int $score, int $ttlSeconds = 604800): bool
+    {
+        $idempotencyKey = $this->idempotencyKey($userId, $postId);
+        $acquired = Redis::set($idempotencyKey, '1', 'EX', $ttlSeconds, 'NX');
+
+        if ($acquired !== true && $acquired !== 'OK') {
+            return false;
+        }
+
+        $this->addPostToUserFeed($userId, $postId, $score);
+
+        return true;
+    }
+
     public function addPostToUserFeeds(array $userIds, string $postId, int $score): void
     {
         if ($userIds === []) {
@@ -30,6 +44,13 @@ class RedisFeedCacheRepository implements FeedCacheRepositoryInterface
                 $pipeline->zremrangebyrank($key, 0, -1 * (self::FEED_MAX_ITEMS + 1));
             }
         });
+    }
+
+    public function addPostToUserFeedsIfAbsent(array $userIds, string $postId, int $score, int $ttlSeconds = 604800): void
+    {
+        foreach ($userIds as $userId) {
+            $this->addPostToUserFeedIfAbsent($userId, $postId, $score, $ttlSeconds);
+        }
     }
 
     public function getUserFeed(string $userId, int $limit = 50, ?int $beforeScore = null): array
@@ -70,5 +91,10 @@ class RedisFeedCacheRepository implements FeedCacheRepositoryInterface
                 $pipeline->zrem(FeedKey::userFeed($userId), $postId);
             }
         });
+    }
+
+    private function idempotencyKey(string $userId, string $postId): string
+    {
+        return "feed:idempotency:user:{$userId}:post:{$postId}";
     }
 }

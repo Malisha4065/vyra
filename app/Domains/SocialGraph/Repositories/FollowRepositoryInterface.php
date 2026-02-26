@@ -30,4 +30,9 @@ interface FollowRepositoryInterface
      * @return array<int, string>
      */
     public function getFollowingIds(string $userId): array;
+
+    /**
+     * @return array<int, string>
+     */
+    public function getFollowerIdsChunk(string $userId, ?string $afterFollowerId = null, int $limit = 1000): array;
 }

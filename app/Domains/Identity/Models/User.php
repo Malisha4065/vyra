@@ -2,10 +2,12 @@
 
 namespace App\Domains\Identity\Models;
 
+use App\Domains\Notification\Models\UserNotification;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -106,5 +108,13 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(User::class, 'mutes', 'muter_id', 'muted_id')
             ->withTimestamps();
+    }
+
+    /**
+     * Notifications targeted at this user.
+     */
+    public function notificationsFeed(): HasMany
+    {
+        return $this->hasMany(UserNotification::class);
     }
 }

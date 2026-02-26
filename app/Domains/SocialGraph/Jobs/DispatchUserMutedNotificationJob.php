@@ -2,6 +2,8 @@
 
 namespace App\Domains\SocialGraph\Jobs;
 
+use App\Domains\Notification\Actions\CreateUserNotificationAction;
+use App\Domains\Notification\Data\CreateUserNotificationData;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -14,8 +16,16 @@ class DispatchUserMutedNotificationJob implements ShouldQueue
         public readonly string $mutedId,
     ) {}
 
-    public function handle(): void
+    public function handle(CreateUserNotificationAction $createNotificationAction): void
     {
-        // Notification fan-out will be implemented in Notification domain.
+        $createNotificationAction(CreateUserNotificationData::from([
+            'user_id' => $this->muterId,
+            'type' => 'social.user_muted',
+            'title' => 'User muted',
+            'body' => 'You muted a user.',
+            'data' => [
+                'muted_user_id' => $this->mutedId,
+            ],
+        ]));
     }
 }

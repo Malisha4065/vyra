@@ -11,7 +11,9 @@ use App\Domains\Feed\Data\GetUserFeedData;
 use App\Domains\Feed\Data\UserFeedResponseData;
 use App\Domains\Feed\Repositories\FeedCacheRepositoryInterface;
 use App\Domains\Feed\Repositories\HybridFeedRepositoryInterface;
+use App\Domains\SocialGraph\Repositories\BlockRepositoryInterface;
 use App\Domains\SocialGraph\Repositories\FollowRepositoryInterface;
+use App\Domains\SocialGraph\Repositories\MuteRepositoryInterface;
 
 class GetUserFeedAction
 {
@@ -20,6 +22,8 @@ class GetUserFeedAction
         private readonly HybridFeedRepositoryInterface $hybridFeedRepository,
         private readonly FollowRepositoryInterface $followRepository,
         private readonly PostRepositoryInterface $postRepository,
+        private readonly BlockRepositoryInterface $blockRepository,
+        private readonly MuteRepositoryInterface $muteRepository,
     ) {}
 
     public function __invoke(GetUserFeedData $data): UserFeedResponseData
@@ -72,11 +76,16 @@ class GetUserFeedAction
 
         $postsById = $this->hydratePosts($rankedItems);
         $items = [];
+        $visibilityMap = [];
 
         foreach ($rankedItems as $item) {
             $post = $postsById[$item['post_id']] ?? null;
 
             if ($post === null) {
+                continue;
+            }
+
+            if (! $this->isAuthorVisible($data->user_id, $post->user_id, $visibilityMap)) {
                 continue;
             }
 
@@ -121,6 +130,30 @@ class GetUserFeedAction
             items: $feedItems,
             next_cursor: $nextCursor,
         );
+    }
+
+    /**
+     * @param array<string, bool> $visibilityMap
+     */
+    private function isAuthorVisible(string $viewerId, string $authorId, array &$visibilityMap): bool
+    {
+        if ($viewerId === $authorId) {
+            return true;
+        }
+
+        if (array_key_exists($authorId, $visibilityMap)) {
+            return $visibilityMap[$authorId];
+        }
+
+        if ($this->muteRepository->isMuting($viewerId, $authorId)) {
+            return $visibilityMap[$authorId] = false;
+        }
+
+        if ($this->blockRepository->eitherBlocked($viewerId, $authorId)) {
+            return $visibilityMap[$authorId] = false;
+        }
+
+        return $visibilityMap[$authorId] = true;
     }
 
     /**
