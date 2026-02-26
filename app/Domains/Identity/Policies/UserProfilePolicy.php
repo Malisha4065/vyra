@@ -4,9 +4,14 @@ namespace App\Domains\Identity\Policies;
 
 use App\Domains\Identity\Models\User;
 use App\Domains\Identity\Models\UserProfile;
+use App\Domains\SocialGraph\Repositories\FollowRepositoryInterface;
 
 class UserProfilePolicy
 {
+    public function __construct(
+        private readonly FollowRepositoryInterface $followRepository,
+    ) {}
+
     /**
      * Determine if the given profile can be viewed by the user.
      */
@@ -23,8 +28,7 @@ class UserProfilePolicy
         }
 
         // Private profiles: only approved followers can view
-        // (Will be enhanced when SocialGraph domain is built)
-        return false;
+        return $this->followRepository->isFollowing($authUser->id, $profile->user_id);
     }
 
     /**
