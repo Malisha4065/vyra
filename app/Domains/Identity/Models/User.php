@@ -2,6 +2,9 @@
 
 namespace App\Domains\Identity\Models;
 
+use App\Domains\Communication\Models\Conversation;
+use App\Domains\Communication\Models\Message;
+use App\Domains\Communication\Models\MessageReadReceipt;
 use App\Domains\Notification\Models\UserNotification;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -108,6 +111,32 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(User::class, 'mutes', 'muter_id', 'muted_id')
             ->withTimestamps();
+    }
+
+    /**
+     * Conversations the user participates in.
+     */
+    public function conversations(): BelongsToMany
+    {
+        return $this->belongsToMany(Conversation::class, 'conversation_participants')
+            ->withPivot(['joined_at', 'last_read_message_id', 'last_read_at'])
+            ->withTimestamps();
+    }
+
+    /**
+     * Messages sent by this user.
+     */
+    public function sentMessages(): HasMany
+    {
+        return $this->hasMany(Message::class, 'sender_id');
+    }
+
+    /**
+     * Message read receipts for this user.
+     */
+    public function messageReadReceipts(): HasMany
+    {
+        return $this->hasMany(MessageReadReceipt::class);
     }
 
     /**
