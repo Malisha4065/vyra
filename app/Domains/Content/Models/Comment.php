@@ -8,24 +8,20 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Post extends Model
+class Comment extends Model
 {
     use HasUuids;
 
     protected $fillable = [
+        'post_id',
         'user_id',
+        'parent_comment_id',
         'body',
-        'published_at',
     ];
 
-    /**
-     * @return array<string, string>
-     */
-    protected function casts(): array
+    public function post(): BelongsTo
     {
-        return [
-            'published_at' => 'datetime',
-        ];
+        return $this->belongsTo(Post::class);
     }
 
     public function author(): BelongsTo
@@ -33,18 +29,13 @@ class Post extends Model
         return $this->belongsTo(User::class, 'user_id');
     }
 
-    public function media(): HasMany
+    public function parent(): BelongsTo
     {
-        return $this->hasMany(PostMedia::class);
+        return $this->belongsTo(self::class, 'parent_comment_id');
     }
 
-    public function comments(): HasMany
+    public function replies(): HasMany
     {
-        return $this->hasMany(Comment::class);
-    }
-
-    public function reactions(): HasMany
-    {
-        return $this->hasMany(PostReaction::class);
+        return $this->hasMany(self::class, 'parent_comment_id');
     }
 }

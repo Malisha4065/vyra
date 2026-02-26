@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Controllers\Content\CommentController;
 use App\Http\Controllers\Identity\LoginController;
 use App\Http\Controllers\Identity\LogoutController;
 use App\Http\Controllers\Identity\ProfileController;
 use App\Http\Controllers\Identity\RegisterController;
 use App\Http\Controllers\Content\PostController;
+use App\Http\Controllers\Content\PostReactionController;
 use App\Http\Controllers\SocialGraph\BlockController;
 use App\Http\Controllers\SocialGraph\FollowController;
 use App\Http\Controllers\SocialGraph\FollowRequestController;
@@ -62,4 +64,8 @@ Route::middleware('auth')->group(function () {
 
     // Content
     Route::post('/posts', [PostController::class, 'store'])->name('posts.store');
+    Route::post('/posts/{post}/comments', [CommentController::class, 'store'])->name('posts.comments.store');
+    Route::delete('/comments/{comment}', [CommentController::class, 'destroy'])->name('comments.destroy');
+    Route::post('/posts/{post}/reactions', [PostReactionController::class, 'store'])->name('posts.reactions.store');
+    Route::delete('/posts/{post}/reactions', [PostReactionController::class, 'destroy'])->name('posts.reactions.destroy');
 });
