@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers\SocialGraph;
 
-use App\Domains\Identity\Models\User;
+use App\Domains\Identity\Repositories\UserRepositoryInterface;
 use App\Domains\SocialGraph\Actions\MuteUserAction;
 use App\Domains\SocialGraph\Actions\UnmuteUserAction;
+use App\Domains\SocialGraph\Data\MuteUserData;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -15,29 +16,49 @@ class MuteController extends Controller
      * Mute a user.
      */
     public function store(
-        User $user,
+        string $user,
         MuteUserAction $action,
+        UserRepositoryInterface $userRepository,
     ): RedirectResponse {
-        $this->authorize('mute', $user);
+        $data = MuteUserData::from([
+            'target_user_id' => $user,
+        ]);
+
+        $targetUser = $userRepository->findById($data->target_user_id);
+
+        abort_if($targetUser === null, 404);
+
+        $this->authorize('mute', $targetUser);
 
         /** @var \App\Domains\Identity\Models\User $authUser */
         $authUser = Auth::user();
-        $action($authUser, $user);
+        $action($authUser, $targetUser, $data);
 
-        return back()->with('success', "You have muted @{$user->username}.");
+        return back()->with('success', "You have muted @{$targetUser->username}.");
     }
 
     /**
      * Unmute a user.
      */
     public function destroy(
-        User $user,
+        string $user,
         UnmuteUserAction $action,
+        UserRepositoryInterface $userRepository,
     ): RedirectResponse {
+        $data = MuteUserData::from([
+            'target_user_id' => $user,
+        ]);
+
+        $targetUser = $userRepository->findById($data->target_user_id);
+
+        abort_if($targetUser === null, 404);
+
+        $this->authorize('unmute', $targetUser);
+
         /** @var \App\Domains\Identity\Models\User $authUser */
         $authUser = Auth::user();
-        $action($authUser, $user);
+        $action($authUser, $targetUser, $data);
 
-        return back()->with('success', "You have unmuted @{$user->username}.");
+        return back()->with('success', "You have unmuted @{$targetUser->username}.");
     }
 }

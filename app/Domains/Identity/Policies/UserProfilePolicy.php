@@ -4,12 +4,14 @@ namespace App\Domains\Identity\Policies;
 
 use App\Domains\Identity\Models\User;
 use App\Domains\Identity\Models\UserProfile;
+use App\Domains\SocialGraph\Repositories\BlockRepositoryInterface;
 use App\Domains\SocialGraph\Repositories\FollowRepositoryInterface;
 
 class UserProfilePolicy
 {
     public function __construct(
         private readonly FollowRepositoryInterface $followRepository,
+        private readonly BlockRepositoryInterface $blockRepository,
     ) {}
 
     /**
@@ -20,6 +22,10 @@ class UserProfilePolicy
         // Owner can always view their own profile
         if ($authUser->id === $profile->user_id) {
             return true;
+        }
+
+        if ($this->blockRepository->eitherBlocked($authUser->id, $profile->user_id)) {
+            return false;
         }
 
         // Public profiles are viewable by any authenticated user

@@ -4,7 +4,10 @@ namespace App\Http\Controllers\SocialGraph;
 
 use App\Domains\SocialGraph\Actions\AcceptFollowRequestAction;
 use App\Domains\SocialGraph\Actions\RejectFollowRequestAction;
+use App\Domains\SocialGraph\Data\AcceptFollowRequestData;
+use App\Domains\SocialGraph\Data\RejectFollowRequestData;
 use App\Domains\SocialGraph\Exceptions\FollowRequestNotFoundException;
+use App\Domains\SocialGraph\Models\FollowRequest;
 use App\Domains\SocialGraph\Repositories\FollowRequestRepositoryInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
@@ -23,6 +26,8 @@ class FollowRequestController extends Controller
      */
     public function index(): Response
     {
+        $this->authorize('viewAny', FollowRequest::class);
+
         /** @var \App\Domains\Identity\Models\User $user */
         $user = Auth::user();
 
@@ -41,7 +46,19 @@ class FollowRequestController extends Controller
         AcceptFollowRequestAction $action,
     ): RedirectResponse {
         try {
-            $action($id);
+            $data = AcceptFollowRequestData::from([
+                'request_id' => $id,
+            ]);
+
+            $request = $this->followRequestRepository->findById($data->request_id);
+
+            if (! $request) {
+                throw new FollowRequestNotFoundException();
+            }
+
+            $this->authorize('accept', $request);
+
+            $action($data);
 
             return back()->with('success', 'Follow request accepted.');
         } catch (FollowRequestNotFoundException $e) {
@@ -57,7 +74,19 @@ class FollowRequestController extends Controller
         RejectFollowRequestAction $action,
     ): RedirectResponse {
         try {
-            $action($id);
+            $data = RejectFollowRequestData::from([
+                'request_id' => $id,
+            ]);
+
+            $request = $this->followRequestRepository->findById($data->request_id);
+
+            if (! $request) {
+                throw new FollowRequestNotFoundException();
+            }
+
+            $this->authorize('reject', $request);
+
+            $action($data);
 
             return back()->with('success', 'Follow request rejected.');
         } catch (FollowRequestNotFoundException $e) {

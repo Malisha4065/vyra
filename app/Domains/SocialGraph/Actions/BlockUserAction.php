@@ -3,6 +3,7 @@
 namespace App\Domains\SocialGraph\Actions;
 
 use App\Domains\Identity\Models\User;
+use App\Domains\SocialGraph\Data\BlockUserData;
 use App\Domains\SocialGraph\Events\UserBlocked;
 use App\Domains\SocialGraph\Repositories\BlockRepositoryInterface;
 use App\Domains\SocialGraph\Repositories\FollowRepositoryInterface;
@@ -16,9 +17,9 @@ class BlockUserAction
         private readonly FollowRequestRepositoryInterface $followRequestRepository,
     ) {}
 
-    public function __invoke(User $blocker, User $blocked): void
+    public function __invoke(User $blocker, User $blocked, BlockUserData $data): void
     {
-        if ($blocker->id === $blocked->id) {
+        if ($blocker->id === $data->target_user_id || $blocker->id === $blocked->id) {
             return;
         }
 

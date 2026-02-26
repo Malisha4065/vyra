@@ -4,6 +4,7 @@ namespace App\Domains\SocialGraph\Actions;
 
 use App\Domains\Identity\Models\User;
 use App\Domains\Identity\Repositories\UserProfileRepositoryInterface;
+use App\Domains\SocialGraph\Data\FollowUserData;
 use App\Domains\SocialGraph\Events\FollowRequestReceived;
 use App\Domains\SocialGraph\Events\UserFollowed;
 use App\Domains\SocialGraph\Exceptions\AlreadyFollowingException;
@@ -31,9 +32,9 @@ class FollowUserAction
      * @throws AlreadyFollowingException
      * @throws UserBlockedException
      */
-    public function __invoke(User $follower, User $followee): string
+    public function __invoke(User $follower, User $followee, FollowUserData $data): string
     {
-        if ($follower->id === $followee->id) {
+        if ($follower->id === $data->target_user_id || $follower->id === $followee->id) {
             throw new CannotFollowSelfException();
         }
 

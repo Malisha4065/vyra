@@ -2,6 +2,7 @@
 
 namespace App\Domains\SocialGraph\Actions;
 
+use App\Domains\SocialGraph\Data\AcceptFollowRequestData;
 use App\Domains\SocialGraph\Events\FollowRequestAccepted;
 use App\Domains\SocialGraph\Events\UserFollowed;
 use App\Domains\SocialGraph\Exceptions\FollowRequestNotFoundException;
@@ -19,9 +20,9 @@ class AcceptFollowRequestAction
     /**
      * @throws FollowRequestNotFoundException
      */
-    public function __invoke(string $requestId): void
+    public function __invoke(AcceptFollowRequestData $data): void
     {
-        $request = $this->followRequestRepository->findById($requestId);
+        $request = $this->followRequestRepository->findById($data->request_id);
 
         if (! $request || ! $request->isPending()) {
             throw new FollowRequestNotFoundException();

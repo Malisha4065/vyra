@@ -3,6 +3,7 @@
 namespace App\Domains\SocialGraph\Actions;
 
 use App\Domains\Identity\Models\User;
+use App\Domains\SocialGraph\Data\MuteUserData;
 use App\Domains\SocialGraph\Events\UserMuted;
 use App\Domains\SocialGraph\Repositories\MuteRepositoryInterface;
 
@@ -12,9 +13,9 @@ class MuteUserAction
         private readonly MuteRepositoryInterface $muteRepository,
     ) {}
 
-    public function __invoke(User $muter, User $muted): void
+    public function __invoke(User $muter, User $muted, MuteUserData $data): void
     {
-        if ($muter->id === $muted->id) {
+        if ($muter->id === $data->target_user_id || $muter->id === $muted->id) {
             return;
         }
 

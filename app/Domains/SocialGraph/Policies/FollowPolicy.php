@@ -42,9 +42,25 @@ class FollowPolicy
     }
 
     /**
+     * Determine if the user can unblock the target.
+     */
+    public function unblock(User $authUser, User $target): bool
+    {
+        return $authUser->id !== $target->id;
+    }
+
+    /**
      * Determine if the user can mute the target.
      */
     public function mute(User $authUser, User $target): bool
+    {
+        return $authUser->id !== $target->id;
+    }
+
+    /**
+     * Determine if the user can unmute the target.
+     */
+    public function unmute(User $authUser, User $target): bool
     {
         return $authUser->id !== $target->id;
     }
