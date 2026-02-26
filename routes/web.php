@@ -4,6 +4,7 @@ use App\Http\Controllers\Identity\LoginController;
 use App\Http\Controllers\Identity\LogoutController;
 use App\Http\Controllers\Identity\ProfileController;
 use App\Http\Controllers\Identity\RegisterController;
+use App\Http\Controllers\Content\PostController;
 use App\Http\Controllers\SocialGraph\BlockController;
 use App\Http\Controllers\SocialGraph\FollowController;
 use App\Http\Controllers\SocialGraph\FollowRequestController;
@@ -58,5 +59,7 @@ Route::middleware('auth')->group(function () {
     // Mute / Unmute
     Route::post('/users/{user}/mute', [MuteController::class, 'store'])->name('user.mute');
     Route::delete('/users/{user}/unmute', [MuteController::class, 'destroy'])->name('user.unmute');
-});
 
+    // Content
+    Route::post('/posts', [PostController::class, 'store'])->name('posts.store');
+});
