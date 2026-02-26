@@ -4,16 +4,20 @@ namespace App\Domains\Content;
 
 use App\Domains\Content\Events\PostCommented;
 use App\Domains\Content\Events\PostCommentDeleted;
+use App\Domains\Content\Events\PostDeleted;
 use App\Domains\Content\Events\PostReactionAdded;
 use App\Domains\Content\Events\PostReactionRemoved;
 use App\Domains\Content\Events\PostPublished;
+use App\Domains\Content\Events\PostUpdated;
 use App\Domains\Content\Listeners\QueuePostCommentedSideEffectsListener;
 use App\Domains\Content\Listeners\QueuePostCommentDeletedSideEffectsListener;
+use App\Domains\Content\Listeners\QueuePostDeletedSideEffectsListener;
 use App\Domains\Content\Listeners\QueuePostFanOutListener;
 use App\Domains\Content\Listeners\QueuePostMediaProcessingListener;
 use App\Domains\Content\Listeners\QueuePostReactionAddedSideEffectsListener;
 use App\Domains\Content\Listeners\QueuePostReactionRemovedSideEffectsListener;
 use App\Domains\Content\Listeners\QueuePostSearchIndexListener;
+use App\Domains\Content\Listeners\QueuePostUpdatedSideEffectsListener;
 use App\Domains\Content\Models\Comment;
 use App\Domains\Content\Models\Post;
 use App\Domains\Content\Models\PostReaction;
@@ -48,6 +52,8 @@ class ContentServiceProvider extends ServiceProvider
         Event::listen(PostCommentDeleted::class, QueuePostCommentDeletedSideEffectsListener::class);
         Event::listen(PostReactionAdded::class, QueuePostReactionAddedSideEffectsListener::class);
         Event::listen(PostReactionRemoved::class, QueuePostReactionRemovedSideEffectsListener::class);
+        Event::listen(PostUpdated::class, QueuePostUpdatedSideEffectsListener::class);
+        Event::listen(PostDeleted::class, QueuePostDeletedSideEffectsListener::class);
 
         Gate::policy(Post::class, PostPolicy::class);
         Gate::policy(Comment::class, CommentPolicy::class);

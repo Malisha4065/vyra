@@ -20,4 +20,14 @@ interface FollowRepositoryInterface
     public function followersCount(string $userId): int;
 
     public function followingCount(string $userId): int;
+
+    /**
+     * @return array<int, string>
+     */
+    public function getFollowerIds(string $userId): array;
+
+    /**
+     * @return array<int, string>
+     */
+    public function getFollowingIds(string $userId): array;
 }

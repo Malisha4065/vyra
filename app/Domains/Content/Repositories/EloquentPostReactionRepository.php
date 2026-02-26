@@ -43,4 +43,24 @@ class EloquentPostReactionRepository implements PostReactionRepositoryInterface
 
         return $reaction;
     }
+
+    public function aggregateForPost(string $postId): array
+    {
+        $rows = $this->model
+            ->selectRaw('type, COUNT(*) as aggregate')
+            ->where('post_id', $postId)
+            ->groupBy('type')
+            ->pluck('aggregate', 'type');
+
+        $summary = [];
+
+        foreach ($rows as $type => $count) {
+            $summary[$type] = (int) $count;
+        }
+
+        return [
+            'total' => array_sum($summary),
+            'by_type' => $summary,
+        ];
+    }
 }

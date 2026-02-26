@@ -12,4 +12,8 @@ interface PostRepositoryInterface
     public function publish(string $userId, ?string $body, array $media): Post;
 
     public function findById(string $id): ?Post;
+
+    public function updateBody(Post $post, string $body): Post;
+
+    public function delete(Post $post): void;
 }

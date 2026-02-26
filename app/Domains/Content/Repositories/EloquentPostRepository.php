@@ -43,7 +43,21 @@ class EloquentPostRepository implements PostRepositoryInterface
     public function findById(string $id): ?Post
     {
         return $this->postModel
-            ->with(['author.profile', 'media'])
+            ->with(['author.profile', 'media', 'comments.author.profile', 'reactions'])
             ->find($id);
+    }
+
+    public function updateBody(Post $post, string $body): Post
+    {
+        $post->update([
+            'body' => $body,
+        ]);
+
+        return $this->findById($post->id) ?? $post;
+    }
+
+    public function delete(Post $post): void
+    {
+        $post->delete();
     }
 }

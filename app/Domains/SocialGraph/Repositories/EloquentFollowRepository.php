@@ -62,4 +62,20 @@ class EloquentFollowRepository implements FollowRepositoryInterface
     {
         return $this->model->where('follower_id', $userId)->count();
     }
+
+    public function getFollowerIds(string $userId): array
+    {
+        return $this->model
+            ->where('followee_id', $userId)
+            ->pluck('follower_id')
+            ->all();
+    }
+
+    public function getFollowingIds(string $userId): array
+    {
+        return $this->model
+            ->where('follower_id', $userId)
+            ->pluck('followee_id')
+            ->all();
+    }
 }

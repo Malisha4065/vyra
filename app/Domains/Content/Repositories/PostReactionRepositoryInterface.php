@@ -11,4 +11,9 @@ interface PostReactionRepositoryInterface
     public function findByUserAndPost(string $postId, string $userId): ?PostReaction;
 
     public function deleteByUserAndPost(string $postId, string $userId): ?PostReaction;
+
+    /**
+     * @return array{total: int, by_type: array<string, int>}
+     */
+    public function aggregateForPost(string $postId): array;
 }

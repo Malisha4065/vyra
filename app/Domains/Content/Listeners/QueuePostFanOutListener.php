@@ -15,6 +15,6 @@ class QueuePostFanOutListener implements ShouldQueue
         NotifyFollowersOfPublishedPostJob::dispatch(
             postId: $event->post->id,
             authorId: $event->author->id,
-        )->onQueue('notifications');
+        )->onQueue('feed');
     }
 }

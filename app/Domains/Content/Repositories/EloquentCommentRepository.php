@@ -3,6 +3,7 @@
 namespace App\Domains\Content\Repositories;
 
 use App\Domains\Content\Models\Comment;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class EloquentCommentRepository implements CommentRepositoryInterface
 {
@@ -25,5 +26,14 @@ class EloquentCommentRepository implements CommentRepositoryInterface
     public function delete(Comment $comment): void
     {
         $comment->delete();
+    }
+
+    public function getReplies(string $commentId, int $perPage = 20): LengthAwarePaginator
+    {
+        return $this->model
+            ->where('parent_comment_id', $commentId)
+            ->with(['author.profile'])
+            ->oldest()
+            ->paginate($perPage);
     }
 }

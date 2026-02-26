@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Content;
 
 use App\Domains\Content\Actions\DeleteCommentAction;
+use App\Domains\Content\Actions\ListCommentRepliesAction;
 use App\Domains\Content\Actions\PublishCommentAction;
 use App\Domains\Content\Data\DeleteCommentData;
+use App\Domains\Content\Data\ListCommentRepliesData;
 use App\Domains\Content\Data\PublishCommentData;
 use App\Domains\Content\Exceptions\CommentNotFoundException;
 use App\Domains\Content\Exceptions\EmptyCommentException;
@@ -13,6 +15,7 @@ use App\Domains\Content\Models\Comment;
 use App\Domains\Content\Repositories\CommentRepositoryInterface;
 use App\Domains\Content\Repositories\PostRepositoryInterface;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 
@@ -65,5 +68,34 @@ class CommentController extends Controller
         $action($commentModel, $data);
 
         return back()->with('success', 'Comment deleted.');
+    }
+
+    public function replies(
+        string $comment,
+        ListCommentRepliesAction $action,
+        CommentRepositoryInterface $commentRepository,
+    ): JsonResponse {
+        $data = ListCommentRepliesData::from([
+            ...request()->all(),
+            'comment_id' => $comment,
+        ]);
+
+        $commentModel = $commentRepository->findById($data->comment_id);
+
+        abort_if($commentModel === null, 404);
+
+        $this->authorize('view', $commentModel->post);
+
+        $replies = $action($data);
+
+        return response()->json([
+            'data' => $replies->items(),
+            'meta' => [
+                'total' => $replies->total(),
+                'current_page' => $replies->currentPage(),
+                'last_page' => $replies->lastPage(),
+                'per_page' => $replies->perPage(),
+            ],
+        ]);
     }
 }

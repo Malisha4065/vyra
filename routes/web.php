@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Content\CommentController;
+use App\Http\Controllers\Feed\FeedController;
 use App\Http\Controllers\Identity\LoginController;
 use App\Http\Controllers\Identity\LogoutController;
 use App\Http\Controllers\Identity\ProfileController;
@@ -12,7 +13,6 @@ use App\Http\Controllers\SocialGraph\FollowController;
 use App\Http\Controllers\SocialGraph\FollowRequestController;
 use App\Http\Controllers\SocialGraph\MuteController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 /*
 |--------------------------------------------------------------------------
@@ -35,8 +35,8 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LogoutController::class, 'destroy'])->name('logout');
 
-    // Feed (placeholder until Feed domain is built)
-    Route::get('/', fn () => Inertia::render('Feed/Index'))->name('feed');
+    // Feed
+    Route::get('/', [FeedController::class, 'index'])->name('feed');
 
     // Profile
     Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -64,8 +64,12 @@ Route::middleware('auth')->group(function () {
 
     // Content
     Route::post('/posts', [PostController::class, 'store'])->name('posts.store');
+    Route::put('/posts/{post}', [PostController::class, 'update'])->name('posts.update');
+    Route::delete('/posts/{post}', [PostController::class, 'destroy'])->name('posts.destroy');
     Route::post('/posts/{post}/comments', [CommentController::class, 'store'])->name('posts.comments.store');
     Route::delete('/comments/{comment}', [CommentController::class, 'destroy'])->name('comments.destroy');
+    Route::get('/comments/{comment}/replies', [CommentController::class, 'replies'])->name('comments.replies.index');
     Route::post('/posts/{post}/reactions', [PostReactionController::class, 'store'])->name('posts.reactions.store');
     Route::delete('/posts/{post}/reactions', [PostReactionController::class, 'destroy'])->name('posts.reactions.destroy');
+    Route::get('/posts/{post}/reactions/summary', [PostReactionController::class, 'summary'])->name('posts.reactions.summary');
 });
