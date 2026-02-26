@@ -24,8 +24,10 @@ class FeedController extends Controller
 
         $this->authorize('view', [UserFeed::class, $data->user_id]);
 
+        $feed = $action($data);
+
         return Inertia::render('Feed/Index', [
-            'feed' => $action($data),
+            'feed' => $feed->toArray(),
         ]);
     }
 }

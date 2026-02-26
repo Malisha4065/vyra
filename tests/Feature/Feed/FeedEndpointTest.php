@@ -1,7 +1,11 @@
 <?php
 
 use App\Domains\Feed\Actions\GetUserFeedAction;
+use App\Domains\Feed\Data\FeedAuthorData;
+use App\Domains\Feed\Data\FeedItemData;
+use App\Domains\Feed\Data\FeedPostData;
 use App\Domains\Feed\Data\GetUserFeedData;
+use App\Domains\Feed\Data\UserFeedResponseData;
 use App\Domains\Identity\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -20,19 +24,26 @@ it('renders feed page with hydrated feed payload', function () {
         ->withArgs(function (GetUserFeedData $data) {
             return $data->user_id === 'user-1' && $data->limit === 50;
         })
-        ->andReturn([
-            'items' => [
-                [
-                    'post_id' => 'post-1',
-                    'score' => 1000,
-                    'post' => [
-                        'id' => 'post-1',
-                        'body' => 'Hydrated post',
-                    ],
-                ],
+        ->andReturn(new UserFeedResponseData(
+            items: [
+                new FeedItemData(
+                    post_id: 'post-1',
+                    score: 1000,
+                    post: new FeedPostData(
+                        id: 'post-1',
+                        user_id: 'author-1',
+                        body: 'Hydrated post',
+                        published_at: null,
+                        author: new FeedAuthorData(
+                            id: 'author-1',
+                            username: 'writer',
+                        ),
+                        counts: ['comments' => 0, 'reactions' => 0],
+                    ),
+                ),
             ],
-            'next_cursor' => 1000,
-        ]);
+            next_cursor: 1000,
+        ));
 
     $this->app->instance(GetUserFeedAction::class, $action);
 

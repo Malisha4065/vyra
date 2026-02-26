@@ -4,7 +4,11 @@ namespace App\Domains\Feed\Actions;
 
 use App\Domains\Content\Models\Post;
 use App\Domains\Content\Repositories\PostRepositoryInterface;
+use App\Domains\Feed\Data\FeedAuthorData;
+use App\Domains\Feed\Data\FeedItemData;
+use App\Domains\Feed\Data\FeedPostData;
 use App\Domains\Feed\Data\GetUserFeedData;
+use App\Domains\Feed\Data\UserFeedResponseData;
 use App\Domains\Feed\Repositories\FeedCacheRepositoryInterface;
 use App\Domains\Feed\Repositories\HybridFeedRepositoryInterface;
 use App\Domains\SocialGraph\Repositories\FollowRepositoryInterface;
@@ -18,14 +22,13 @@ class GetUserFeedAction
         private readonly PostRepositoryInterface $postRepository,
     ) {}
 
-    /**
-     * @return array{items: array<int, array{post_id: string, score: int, post: array<string, mixed>}>, next_cursor: int|null}
-     */
-    public function __invoke(GetUserFeedData $data): array
+    public function __invoke(GetUserFeedData $data): UserFeedResponseData
     {
+        $fetchLimit = min($data->limit * 3, 200);
+
         $cachedFeed = $this->feedCacheRepository->getUserFeed(
             userId: $data->user_id,
-            limit: $data->limit,
+            limit: $fetchLimit,
             beforeScore: $data->before_score,
         );
 
@@ -34,7 +37,7 @@ class GetUserFeedAction
 
         $hybridFeed = $this->hybridFeedRepository->getRecentPostsForHighFollowerAuthors(
             authorIds: $highFollowerAuthors,
-            limitPerAuthor: $data->hybrid_per_author,
+            limitPerAuthor: min($data->hybrid_per_author * 2, 20),
             beforeScore: $data->before_score,
         );
 
@@ -84,12 +87,40 @@ class GetUserFeedAction
             ];
         }
 
-        $nextCursor = $items === [] ? null : (int) end($items)['score'];
+        $nextCursor = null;
 
-        return [
-            'items' => $items,
-            'next_cursor' => $nextCursor,
-        ];
+        if (count($items) === $data->limit) {
+            $nextCursor = (int) end($items)['score'];
+        } elseif ($rankedItems !== []) {
+            // Cursor hardening: progress pagination even when ranked entries contain stale/deleted posts.
+            $nextCursor = (int) end($rankedItems)['score'];
+        }
+
+        $feedItems = array_map(function (array $item): FeedItemData {
+            /** @var array<string, mixed> $post */
+            $post = $item['post'];
+
+            return new FeedItemData(
+                post_id: $item['post_id'],
+                score: $item['score'],
+                post: new FeedPostData(
+                    id: $post['id'],
+                    user_id: $post['user_id'],
+                    body: $post['body'],
+                    published_at: $post['published_at'],
+                    author: new FeedAuthorData(
+                        id: $post['author']['id'],
+                        username: $post['author']['username'],
+                    ),
+                    counts: $post['counts'],
+                ),
+            );
+        }, $items);
+
+        return new UserFeedResponseData(
+            items: $feedItems,
+            next_cursor: $nextCursor,
+        );
     }
 
     /**
