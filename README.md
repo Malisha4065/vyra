@@ -1,59 +1,106 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Vyra
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+> A modern, scalable social media platform built with Laravel 12, Vue 3, and Domain-Driven Design.
 
-## About Laravel
+## Tech Stack
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+| Layer | Technology |
+|---|---|
+| **Backend** | Laravel 12 (PHP 8.2+) |
+| **Frontend** | Vue 3 (Composition API) + Inertia.js |
+| **Styling** | Tailwind CSS v4 |
+| **Database** | PostgreSQL |
+| **Cache & Queues** | Redis |
+| **Queue Dashboard** | Laravel Horizon |
+| **WebSockets** | Laravel Reverb |
+| **Search** | Laravel Scout + Meilisearch |
+| **File Storage** | Amazon S3 (via Flysystem) |
+| **Testing** | Pest PHP |
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Architecture
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Vyra follows **Domain-Driven Design (DDD)** with strict architectural constraints:
 
-## Learning Laravel
+- **No Fat Controllers** — Controllers only handle HTTP, authorize via Policy, map to DTO, and delegate to an Action.
+- **DTOs** — All request/response data flows through strongly-typed `spatie/laravel-data` objects.
+- **Action Classes** — Each business operation lives in its own single-responsibility, invokable Action class.
+- **Repository Pattern** — All database access goes through interfaces, never raw Eloquent in controllers or actions.
+- **Event-Driven** — Side effects (notifications, feed fan-out, media processing) are handled via queued Events and Listeners.
+- **Authorization** — Every resource action is authorized through a dedicated Policy.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+## Domain Modules
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Code is organized by domain inside `app/Domains/`:
 
-## Laravel Sponsors
+| Domain | Responsibility |
+|---|---|
+| **Identity** | Authentication, registration, profiles, privacy settings |
+| **SocialGraph** | Follow/unfollow, follow requests, blocking, muting |
+| **Content** | Posts, comments, likes/reactions, hashtags, media |
+| **Feed** | Timeline aggregation, fan-out on write, Redis sorted sets |
+| **Communication** | Direct messaging, read receipts, typing indicators |
+| **Notification** | In-app notifications, preferences, queued delivery |
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+Each domain contains: `Models/`, `Data/`, `Actions/`, `Events/`, `Listeners/`, `Jobs/`, `Policies/`, `Repositories/`, `ValueObjects/`, `Exceptions/`
 
-### Premium Partners
+## Getting Started
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+### Prerequisites
 
-## Contributing
+- PHP 8.2+
+- PostgreSQL
+- Redis
+- Node.js 18+
+- Composer
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### Installation
 
-## Code of Conduct
+```bash
+# Clone and install dependencies
+git clone <repo-url> vyra && cd vyra
+php composer.phar install
+npm install
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+# Configure environment
+cp .env.example .env
+php artisan key:generate
 
-## Security Vulnerabilities
+# Create database
+createdb vyra
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+# Run migrations
+php artisan migrate
+
+# Build frontend
+npm run build
+```
+
+### Development
+
+```bash
+# Start the dev server
+php artisan serve
+
+# Start Vite dev server (separate terminal)
+npm run dev
+
+# Run tests
+./vendor/bin/pest
+
+# Queue processing
+php artisan horizon
+```
+
+## Feed Architecture
+
+Vyra uses a **fan-out on write** strategy with a hybrid threshold:
+
+- Posts are pushed to each follower's Redis sorted set (`feed:{user_id}`) at publish time.
+- Accounts with **≥ 10,000 followers** skip fan-out — their posts are merged at read time.
+- Feed reads use `ZREVRANGEBYSCORE` with cursor-based pagination for sub-10ms response times.
+
+See [docs/feed-architecture.md](docs/feed-architecture.md) for the full technical specification.
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+This project is proprietary.
