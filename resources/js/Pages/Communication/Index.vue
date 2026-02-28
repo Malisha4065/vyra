@@ -1,0 +1,473 @@
+<script setup>
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { usePage } from '@inertiajs/vue3';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import { ensureEcho } from '@/lib/echo';
+
+const page = usePage();
+
+const authUserId = computed(() => page.props.auth?.user?.id ?? null);
+
+const conversations = ref([]);
+const messages = ref([]);
+const activeConversationId = ref(null);
+const composer = ref('');
+
+const loadingConversations = ref(false);
+const loadingMessages = ref(false);
+const sendingMessage = ref(false);
+
+const remoteTypingUserIds = ref([]);
+
+const messageListRef = ref(null);
+
+let echo = null;
+let subscribedConversationId = null;
+let typingDebounce = null;
+const typingClearTimers = new Map();
+let localTyping = false;
+
+const activeConversation = computed(() =>
+    conversations.value.find((conversation) => conversation.id === activeConversationId.value) ?? null,
+);
+
+const typingLabel = computed(() => {
+    if (!activeConversation.value || remoteTypingUserIds.value.length === 0) {
+        return null;
+    }
+
+    const participants = activeConversation.value.participants ?? [];
+    const names = remoteTypingUserIds.value
+        .map((id) => participants.find((participant) => participant.id === id)?.username)
+        .filter(Boolean);
+
+    if (names.length === 0) {
+        return 'Someone is typing...';
+    }
+
+    return `${names.join(', ')} ${names.length > 1 ? 'are' : 'is'} typing...`;
+});
+
+function conversationTitle(conversation) {
+    const participants = conversation?.participants ?? [];
+    const otherParticipant = participants.find((participant) => participant.id !== authUserId.value);
+
+    return otherParticipant?.username ?? 'Direct conversation';
+}
+
+function latestPreview(conversation) {
+    return conversation?.latest_message?.body ?? 'No messages yet';
+}
+
+function isOwnMessage(message) {
+    return message.sender_id === authUserId.value;
+}
+
+function normalizeMessage(message) {
+    return {
+        id: message.id,
+        conversation_id: message.conversation_id,
+        sender_id: message.sender_id,
+        body: message.body,
+        metadata: message.metadata ?? {},
+        created_at: message.created_at,
+        sender: {
+            id: message.sender?.id,
+            username: message.sender?.username,
+        },
+    };
+}
+
+function clearTypingState() {
+    remoteTypingUserIds.value = [];
+
+    for (const timeout of typingClearTimers.values()) {
+        clearTimeout(timeout);
+    }
+
+    typingClearTimers.clear();
+}
+
+function touchConversation(conversationId, message) {
+    const index = conversations.value.findIndex((conversation) => conversation.id === conversationId);
+
+    if (index === -1) {
+        loadConversations(false);
+        return;
+    }
+
+    const current = conversations.value[index];
+    const updated = {
+        ...current,
+        latest_message: {
+            id: message.id,
+            body: message.body,
+            sender_id: message.sender_id,
+            created_at: message.created_at,
+            sender: message.sender,
+        },
+        updated_at: message.created_at,
+    };
+
+    conversations.value.splice(index, 1);
+    conversations.value.unshift(updated);
+}
+
+function upsertMessage(message) {
+    const normalized = normalizeMessage(message);
+
+    if (messages.value.some((current) => current.id === normalized.id)) {
+        return;
+    }
+
+    messages.value.push(normalized);
+    messages.value.sort((a, b) => {
+        if (!a.created_at || !b.created_at) {
+            return 0;
+        }
+
+        return a.created_at.localeCompare(b.created_at);
+    });
+
+    scrollMessagesToBottom();
+}
+
+function scrollMessagesToBottom() {
+    nextTick(() => {
+        if (!messageListRef.value) {
+            return;
+        }
+
+        messageListRef.value.scrollTop = messageListRef.value.scrollHeight;
+    });
+}
+
+function handleTypingEvent(payload) {
+    if (payload.conversation_id !== activeConversationId.value) {
+        return;
+    }
+
+    if (payload.user_id === authUserId.value) {
+        return;
+    }
+
+    if (payload.is_typing) {
+        if (!remoteTypingUserIds.value.includes(payload.user_id)) {
+            remoteTypingUserIds.value.push(payload.user_id);
+        }
+
+        if (typingClearTimers.has(payload.user_id)) {
+            clearTimeout(typingClearTimers.get(payload.user_id));
+        }
+
+        const timeout = setTimeout(() => {
+            remoteTypingUserIds.value = remoteTypingUserIds.value.filter((id) => id !== payload.user_id);
+            typingClearTimers.delete(payload.user_id);
+        }, 3000);
+
+        typingClearTimers.set(payload.user_id, timeout);
+
+        return;
+    }
+
+    remoteTypingUserIds.value = remoteTypingUserIds.value.filter((id) => id !== payload.user_id);
+
+    if (typingClearTimers.has(payload.user_id)) {
+        clearTimeout(typingClearTimers.get(payload.user_id));
+        typingClearTimers.delete(payload.user_id);
+    }
+}
+
+async function subscribeToConversation(conversationId) {
+    echo = await ensureEcho();
+
+    if (!echo) {
+        return;
+    }
+
+    if (subscribedConversationId) {
+        echo.leave(`conversation.${subscribedConversationId}`);
+    }
+
+    subscribedConversationId = conversationId;
+
+    echo.private(`conversation.${conversationId}`)
+        .listen('.communication.message.sent', (payload) => {
+            if (payload.conversation_id !== conversationId) {
+                return;
+            }
+
+            upsertMessage(payload.message);
+            touchConversation(payload.conversation_id, payload.message);
+
+            if (payload.message.sender_id !== authUserId.value) {
+                markConversationRead();
+            }
+        })
+        .listen('.communication.typing.updated', (payload) => {
+            handleTypingEvent(payload);
+        });
+}
+
+async function loadConversations(selectFirst = true) {
+    loadingConversations.value = true;
+
+    try {
+        const response = await window.axios.get(route('messages.conversations.index'));
+        conversations.value = response.data.data ?? [];
+
+        if (selectFirst && !activeConversationId.value && conversations.value.length > 0) {
+            activeConversationId.value = conversations.value[0].id;
+        }
+    } finally {
+        loadingConversations.value = false;
+    }
+}
+
+async function loadMessages() {
+    if (!activeConversationId.value) {
+        messages.value = [];
+        return;
+    }
+
+    loadingMessages.value = true;
+
+    try {
+        const response = await window.axios.get(route('messages.conversations.messages.index', {
+            conversation: activeConversationId.value,
+        }));
+
+        messages.value = (response.data.data ?? []).map(normalizeMessage);
+        scrollMessagesToBottom();
+    } finally {
+        loadingMessages.value = false;
+    }
+}
+
+async function markConversationRead() {
+    if (!activeConversationId.value) {
+        return;
+    }
+
+    await window.axios.put(route('messages.conversations.read', {
+        conversation: activeConversationId.value,
+    }));
+}
+
+async function emitTyping(isTyping) {
+    if (!activeConversationId.value) {
+        return;
+    }
+
+    await window.axios.post(route('messages.conversations.typing', {
+        conversation: activeConversationId.value,
+    }), {
+        is_typing: isTyping,
+    });
+
+    localTyping = isTyping;
+}
+
+async function sendMessage() {
+    const body = composer.value.trim();
+
+    if (!activeConversationId.value || body === '' || sendingMessage.value) {
+        return;
+    }
+
+    sendingMessage.value = true;
+
+    try {
+        await window.axios.post(route('messages.conversations.messages.store', {
+            conversation: activeConversationId.value,
+        }), {
+            body,
+        });
+
+        composer.value = '';
+
+        if (typingDebounce) {
+            clearTimeout(typingDebounce);
+            typingDebounce = null;
+        }
+
+        if (localTyping) {
+            await emitTyping(false);
+        }
+
+        await loadMessages();
+        await loadConversations(false);
+    } finally {
+        sendingMessage.value = false;
+    }
+}
+
+function handleComposerInput() {
+    if (!activeConversationId.value) {
+        return;
+    }
+
+    const hasText = composer.value.trim() !== '';
+
+    if (hasText && !localTyping) {
+        emitTyping(true);
+    }
+
+    if (typingDebounce) {
+        clearTimeout(typingDebounce);
+    }
+
+    typingDebounce = setTimeout(() => {
+        if (localTyping) {
+            emitTyping(false);
+        }
+    }, 1200);
+}
+
+watch(activeConversationId, async (conversationId) => {
+    clearTypingState();
+
+    if (!conversationId) {
+        return;
+    }
+
+    await loadMessages();
+    await markConversationRead();
+    await subscribeToConversation(conversationId);
+});
+
+onMounted(async () => {
+    await loadConversations(true);
+});
+
+onBeforeUnmount(async () => {
+    clearTypingState();
+
+    if (typingDebounce) {
+        clearTimeout(typingDebounce);
+    }
+
+    if (localTyping) {
+        try {
+            await emitTyping(false);
+        } catch {
+            // ignore network shutdown during navigation
+        }
+    }
+
+    if (echo && subscribedConversationId) {
+        echo.leave(`conversation.${subscribedConversationId}`);
+    }
+});
+</script>
+
+<template>
+    <AppLayout title="Messages">
+        <div class="grid gap-4 lg:grid-cols-[320px_1fr]">
+            <section class="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                <h1 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
+                    Conversations
+                </h1>
+
+                <div v-if="loadingConversations" class="text-sm text-gray-500 dark:text-gray-400">
+                    Loading conversations...
+                </div>
+
+                <div v-else-if="conversations.length === 0" class="text-sm text-gray-500 dark:text-gray-400">
+                    No conversations yet.
+                </div>
+
+                <div v-else class="space-y-2">
+                    <button
+                        v-for="conversation in conversations"
+                        :key="conversation.id"
+                        type="button"
+                        class="w-full rounded-xl border p-3 text-left transition-colors"
+                        :class="conversation.id === activeConversationId
+                            ? 'border-primary-500 bg-primary-50 dark:border-primary-500 dark:bg-primary-500/10'
+                            : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'"
+                        @click="activeConversationId = conversation.id"
+                    >
+                        <div class="flex items-center justify-between gap-2">
+                            <p class="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                                {{ conversationTitle(conversation) }}
+                            </p>
+                            <span class="text-xs text-gray-400">
+                                {{ conversation.latest_message?.created_at?.slice(11, 16) ?? '' }}
+                            </span>
+                        </div>
+                        <p class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
+                            {{ latestPreview(conversation) }}
+                        </p>
+                    </button>
+                </div>
+            </section>
+
+            <section class="flex min-h-[70vh] flex-col rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+                <header class="border-b border-gray-200 px-4 py-3 dark:border-gray-800">
+                    <h2 class="text-sm font-semibold text-gray-900 dark:text-white">
+                        {{ activeConversation ? conversationTitle(activeConversation) : 'Select a conversation' }}
+                    </h2>
+                    <p v-if="typingLabel" class="mt-1 text-xs text-primary-600 dark:text-primary-400">
+                        {{ typingLabel }}
+                    </p>
+                </header>
+
+                <div ref="messageListRef" class="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+                    <div v-if="!activeConversation" class="text-sm text-gray-500 dark:text-gray-400">
+                        Choose a conversation to start messaging.
+                    </div>
+
+                    <div v-else-if="loadingMessages" class="text-sm text-gray-500 dark:text-gray-400">
+                        Loading messages...
+                    </div>
+
+                    <div v-else-if="messages.length === 0" class="text-sm text-gray-500 dark:text-gray-400">
+                        No messages yet.
+                    </div>
+
+                    <div v-else>
+                        <div
+                            v-for="message in messages"
+                            :key="message.id"
+                            class="mb-3 flex"
+                            :class="isOwnMessage(message) ? 'justify-end' : 'justify-start'"
+                        >
+                            <div
+                                class="max-w-[75%] rounded-2xl px-4 py-2 text-sm"
+                                :class="isOwnMessage(message)
+                                    ? 'bg-primary-600 text-white'
+                                    : 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100'"
+                            >
+                                <p v-if="!isOwnMessage(message)" class="mb-1 text-xs opacity-70">
+                                    {{ message.sender?.username ?? 'Unknown' }}
+                                </p>
+                                <p class="whitespace-pre-wrap break-words">{{ message.body }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <form class="border-t border-gray-200 p-4 dark:border-gray-800" @submit.prevent="sendMessage">
+                    <div class="flex gap-2">
+                        <input
+                            v-model="composer"
+                            type="text"
+                            class="w-full rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-900 outline-none ring-primary-500 focus:ring-2 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                            placeholder="Type a message..."
+                            :disabled="!activeConversation || sendingMessage"
+                            @input="handleComposerInput"
+                        >
+                        <button
+                            type="submit"
+                            class="rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            :disabled="!activeConversation || sendingMessage || composer.trim() === ''"
+                        >
+                            Send
+                        </button>
+                    </div>
+                </form>
+            </section>
+        </div>
+    </AppLayout>
+</template>

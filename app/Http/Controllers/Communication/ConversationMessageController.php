@@ -7,6 +7,7 @@ use App\Domains\Communication\Actions\SendMessageAction;
 use App\Domains\Communication\Data\ListConversationMessagesData;
 use App\Domains\Communication\Data\SendMessageData;
 use App\Domains\Communication\Exceptions\EmptyMessageException;
+use App\Domains\Communication\Models\Message;
 use App\Domains\Communication\Repositories\ConversationRepositoryInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -31,9 +32,16 @@ class ConversationMessageController extends Controller
         $this->authorize('view', $conversationModel);
 
         $messages = $action($data);
+        $items = array_map(function ($message): array {
+            if ($message instanceof Message) {
+                return $this->serializeMessage($message);
+            }
+
+            return (array) $message;
+        }, $messages->items());
 
         return response()->json([
-            'data' => $messages->items(),
+            'data' => $items,
             'meta' => [
                 'total' => $messages->total(),
                 'current_page' => $messages->currentPage(),
@@ -74,5 +82,24 @@ class ConversationMessageController extends Controller
                 'message_id' => $message->id,
             ],
         ], 201);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeMessage(Message $message): array
+    {
+        return [
+            'id' => $message->id,
+            'conversation_id' => $message->conversation_id,
+            'sender_id' => $message->sender_id,
+            'body' => $message->body,
+            'metadata' => $message->metadata ?? [],
+            'created_at' => $message->created_at?->toIso8601String(),
+            'sender' => [
+                'id' => $message->sender?->id,
+                'username' => $message->sender?->username,
+            ],
+        ];
     }
 }

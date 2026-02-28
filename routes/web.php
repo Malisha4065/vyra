@@ -3,6 +3,7 @@
 use App\Http\Controllers\Content\CommentController;
 use App\Http\Controllers\Communication\ConversationController;
 use App\Http\Controllers\Communication\ConversationMessageController;
+use App\Http\Controllers\Communication\MessagePageController;
 use App\Http\Controllers\Feed\FeedController;
 use App\Http\Controllers\Identity\LoginController;
 use App\Http\Controllers\Identity\LogoutController;
@@ -82,6 +83,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
 
     // Communication
+    Route::get('/messages', [MessagePageController::class, 'index'])->name('messages.index');
     Route::get('/messages/conversations', [ConversationController::class, 'index'])->name('messages.conversations.index');
     Route::post('/messages/conversations/direct', [ConversationController::class, 'startDirect'])->name('messages.conversations.direct.start');
     Route::get('/messages/conversations/{conversation}/messages', [ConversationMessageController::class, 'index'])->name('messages.conversations.messages.index');

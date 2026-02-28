@@ -18,6 +18,9 @@ defineProps({
                 </a>
 
                 <div class="flex items-center gap-4">
+                    <a :href="route('messages.index')" class="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors">
+                        Messages
+                    </a>
                     <a :href="route('profile.edit')" class="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors">
                         Profile
                     </a>

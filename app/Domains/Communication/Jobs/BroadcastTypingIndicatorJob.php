@@ -2,6 +2,7 @@
 
 namespace App\Domains\Communication\Jobs;
 
+use App\Domains\Communication\Events\Broadcast\TypingIndicatorBroadcast;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -18,6 +19,11 @@ class BroadcastTypingIndicatorJob implements ShouldQueue
 
     public function handle(): void
     {
-        // Reverb broadcast will be implemented with frontend subscription channels.
+        event(new TypingIndicatorBroadcast(
+            conversationId: $this->conversationId,
+            userId: $this->userId,
+            isTyping: $this->isTyping,
+            occurredAt: $this->occurredAt,
+        ));
     }
 }

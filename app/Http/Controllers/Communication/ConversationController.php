@@ -14,6 +14,7 @@ use App\Domains\Communication\Exceptions\CannotMessageSelfException;
 use App\Domains\Communication\Exceptions\DirectConversationBlockedException;
 use App\Domains\Communication\Exceptions\EmptyMessageException;
 use App\Domains\Communication\Models\Conversation;
+use App\Domains\Communication\Models\Message;
 use App\Domains\Communication\Repositories\ConversationRepositoryInterface;
 use App\Domains\Identity\Repositories\UserRepositoryInterface;
 use App\Http\Controllers\Controller;
@@ -31,9 +32,16 @@ class ConversationController extends Controller
         $user = Auth::user();
 
         $conversations = $action($user, $data);
+        $items = array_map(function ($conversation): array {
+            if ($conversation instanceof Conversation) {
+                return $this->serializeConversation($conversation);
+            }
+
+            return (array) $conversation;
+        }, $conversations->items());
 
         return response()->json([
-            'data' => $conversations->items(),
+            'data' => $items,
             'meta' => [
                 'total' => $conversations->total(),
                 'current_page' => $conversations->currentPage(),
@@ -124,5 +132,34 @@ class ConversationController extends Controller
                 'is_typing' => $data->is_typing,
             ],
         ], 202);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeConversation(Conversation $conversation): array
+    {
+        /** @var Message|null $latestMessage */
+        $latestMessage = $conversation->latestMessage;
+
+        return [
+            'id' => $conversation->id,
+            'type' => $conversation->type,
+            'updated_at' => $conversation->updated_at?->toIso8601String(),
+            'participants' => $conversation->participants->map(static fn ($participant): array => [
+                'id' => $participant->id,
+                'username' => $participant->username,
+            ])->values()->all(),
+            'latest_message' => $latestMessage ? [
+                'id' => $latestMessage->id,
+                'body' => $latestMessage->body,
+                'sender_id' => $latestMessage->sender_id,
+                'created_at' => $latestMessage->created_at?->toIso8601String(),
+                'sender' => [
+                    'id' => $latestMessage->sender?->id,
+                    'username' => $latestMessage->sender?->username,
+                ],
+            ] : null,
+        ];
     }
 }
