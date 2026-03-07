@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Domains\Notification\Repositories\UserNotificationRepositoryInterface;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -38,6 +39,14 @@ class HandleInertiaRequests extends Middleware
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
             ],
+            'notification_summary' => fn (): array => $request->user()
+                ? [
+                    'unread_count' => app(UserNotificationRepositoryInterface::class)
+                        ->unreadCount($request->user()->id),
+                ]
+                : [
+                    'unread_count' => 0,
+                ],
         ];
     }
 }

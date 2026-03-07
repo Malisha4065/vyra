@@ -11,6 +11,8 @@ interface UserNotificationRepositoryInterface
 
     public function findById(string $id): ?UserNotification;
 
+    public function unreadCount(string $userId): int;
+
     public function markAsRead(UserNotification $notification): UserNotification;
 
     public function markAllAsRead(string $userId): int;

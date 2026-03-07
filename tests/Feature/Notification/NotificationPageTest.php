@@ -3,12 +3,12 @@
 use App\Domains\Identity\Models\User;
 use App\Domains\Notification\Repositories\UserNotificationRepositoryInterface;
 
-it('renders messages page for authenticated user', function () {
+it('renders notification center page for authenticated user', function () {
     $user = new User();
     $user->forceFill([
         'id' => 'user-1',
-        'username' => 'alice',
-        'email' => 'alice@example.com',
+        'username' => 'owner',
+        'email' => 'owner@example.com',
         'password' => 'secret',
     ]);
 
@@ -16,11 +16,11 @@ it('renders messages page for authenticated user', function () {
     $repository->shouldReceive('unreadCount')
         ->once()
         ->with('user-1')
-        ->andReturn(0);
+        ->andReturn(5);
 
     $this->app->instance(UserNotificationRepositoryInterface::class, $repository);
 
-    $response = $this->actingAs($user)->get(route('messages.index'));
+    $response = $this->actingAs($user)->get(route('notifications.page'));
 
     $response->assertOk();
 });

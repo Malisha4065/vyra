@@ -21,6 +21,14 @@ class EloquentUserNotificationRepository implements UserNotificationRepositoryIn
         return $this->model->find($id);
     }
 
+    public function unreadCount(string $userId): int
+    {
+        return $this->model
+            ->where('user_id', $userId)
+            ->whereNull('read_at')
+            ->count();
+    }
+
     public function markAsRead(UserNotification $notification): UserNotification
     {
         if ($notification->read_at !== null) {

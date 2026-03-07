@@ -7,6 +7,7 @@ use App\Domains\Feed\Data\FeedPostData;
 use App\Domains\Feed\Data\GetUserFeedData;
 use App\Domains\Feed\Data\UserFeedResponseData;
 use App\Domains\Identity\Models\User;
+use App\Domains\Notification\Repositories\UserNotificationRepositoryInterface;
 use Inertia\Testing\AssertableInertia as Assert;
 
 it('renders feed page with hydrated feed payload', function () {
@@ -46,6 +47,14 @@ it('renders feed page with hydrated feed payload', function () {
         ));
 
     $this->app->instance(GetUserFeedAction::class, $action);
+
+    $notificationRepository = mock(UserNotificationRepositoryInterface::class);
+    $notificationRepository->shouldReceive('unreadCount')
+        ->once()
+        ->with('user-1')
+        ->andReturn(0);
+
+    $this->app->instance(UserNotificationRepositoryInterface::class, $notificationRepository);
 
     $response = $this->actingAs($user)->get(route('feed'));
 
