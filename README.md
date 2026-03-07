@@ -89,6 +89,7 @@ npm run dev
 
 # Queue processing
 php artisan horizon
+php artisan ops:queue-health
 ```
 
 ## Feed Architecture

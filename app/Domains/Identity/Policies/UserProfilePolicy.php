@@ -14,6 +14,11 @@ class UserProfilePolicy
         private readonly BlockRepositoryInterface $blockRepository,
     ) {}
 
+    public function viewAny(User $authUser): bool
+    {
+        return $authUser->id !== '';
+    }
+
     /**
      * Determine if the given profile can be viewed by the user.
      */

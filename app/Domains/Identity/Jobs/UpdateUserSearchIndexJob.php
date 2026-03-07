@@ -22,6 +22,7 @@ class UpdateUserSearchIndexJob implements ShouldQueue
             return;
         }
 
+        $user->loadMissing('profile');
         $user->searchable();
     }
 }

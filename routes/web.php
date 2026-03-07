@@ -10,6 +10,7 @@ use App\Http\Controllers\Identity\LoginController;
 use App\Http\Controllers\Identity\LogoutController;
 use App\Http\Controllers\Identity\ProfileController;
 use App\Http\Controllers\Identity\RegisterController;
+use App\Http\Controllers\Identity\UserSearchController;
 use App\Http\Controllers\Notification\NotificationController;
 use App\Http\Controllers\Notification\NotificationPageController;
 use App\Http\Controllers\Notification\NotificationPreferenceController;
@@ -53,6 +54,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/profile/privacy', [ProfileController::class, 'updatePrivacy'])->name('profile.privacy');
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
     Route::delete('/profile/account', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::get('/users/search', [UserSearchController::class, 'index'])->name('users.search');
     Route::get('/@{username}', [ProfileController::class, 'show'])->name('profile.show');
 
     // ─── SocialGraph ─────────────────────────────────────────────────
