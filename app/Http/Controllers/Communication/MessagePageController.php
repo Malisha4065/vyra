@@ -13,6 +13,7 @@ class MessagePageController extends Controller
     {
         return Inertia::render('Communication/Index', [
             'targetUserId' => $request->string('target_user_id')->toString() ?: null,
+            'conversationId' => $request->string('conversation_id')->toString() ?: null,
         ]);
     }
 }

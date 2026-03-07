@@ -62,9 +62,43 @@ it('renders feed page with hydrated feed payload', function () {
     $response->assertOk();
     $response->assertInertia(fn (Assert $page) => $page
         ->component('Feed/Index')
+        ->where('focusPostId', null)
         ->where('feed.next_cursor', 1000)
         ->where('feed.items.0.post_id', 'post-1')
         ->where('feed.items.0.post.body', 'Hydrated post'));
+});
+
+it('passes focus post id to feed page when requested', function () {
+    $user = new User();
+    $user->forceFill([
+        'id' => 'user-1',
+        'username' => 'reader',
+        'email' => 'reader@example.com',
+        'password' => 'secret',
+    ]);
+
+    $action = mock(GetUserFeedAction::class);
+    $action->shouldReceive('__invoke')
+        ->once()
+        ->andReturn(new UserFeedResponseData(items: [], next_cursor: null));
+
+    $this->app->instance(GetUserFeedAction::class, $action);
+
+    $notificationRepository = mock(UserNotificationRepositoryInterface::class);
+    $notificationRepository->shouldReceive('unreadCount')
+        ->once()
+        ->with('user-1')
+        ->andReturn(0);
+
+    $this->app->instance(UserNotificationRepositoryInterface::class, $notificationRepository);
+
+    $response = $this->actingAs($user)->get(route('feed', ['focus_post_id' => 'post-99']));
+
+    $response->assertOk();
+    $response->assertInertia(fn (Assert $page) => $page
+        ->component('Feed/Index')
+        ->where('focusPostId', 'post-99')
+    );
 });
 
 it('returns feed json for cursor pagination requests', function () {

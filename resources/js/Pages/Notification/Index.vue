@@ -1,8 +1,15 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { ensureEcho } from '@/lib/echo';
+
+const props = defineProps({
+    preferences: {
+        type: Object,
+        required: true,
+    },
+});
 
 const page = usePage();
 
@@ -11,6 +18,16 @@ const unreadOnly = ref(false);
 const unreadTotal = ref(0);
 const loading = ref(false);
 const markingAll = ref(false);
+const savingPreferences = ref(false);
+const preferenceSaved = ref(false);
+const preferenceError = ref(null);
+
+const preferences = reactive({
+    social_enabled: props.preferences.social_enabled,
+    content_enabled: props.preferences.content_enabled,
+    communication_enabled: props.preferences.communication_enabled,
+    account_enabled: props.preferences.account_enabled,
+});
 
 let echo = null;
 let subscribedChannel = null;
@@ -38,6 +55,8 @@ function normalizeNotification(notification) {
         data: notification.data ?? {},
         read_at: notification.read_at,
         created_at: notification.created_at,
+        action_url: notification.action_url ?? null,
+        action_label: notification.action_label ?? null,
     };
 }
 
@@ -74,6 +93,31 @@ function notificationAccent(notification) {
     }
 
     return 'border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900';
+}
+
+async function savePreferences() {
+    if (savingPreferences.value) {
+        return;
+    }
+
+    savingPreferences.value = true;
+    preferenceSaved.value = false;
+    preferenceError.value = null;
+
+    try {
+        const response = await window.axios.put(route('notifications.preferences.update'), preferences, {
+            headers: {
+                Accept: 'application/json',
+            },
+        });
+
+        Object.assign(preferences, response.data.data ?? {});
+        preferenceSaved.value = true;
+    } catch (error) {
+        preferenceError.value = error?.response?.data?.message ?? 'Unable to update notification preferences.';
+    } finally {
+        savingPreferences.value = false;
+    }
 }
 
 async function loadNotifications() {
@@ -115,6 +159,18 @@ async function markRead(notificationId) {
 
     unreadTotal.value = response.data.meta?.unread_total ?? unreadTotal.value;
     dispatchUnreadCount();
+}
+
+async function openNotification(notification) {
+    if (!notification.action_url) {
+        return;
+    }
+
+    if (!notification.read_at) {
+        await markRead(notification.id);
+    }
+
+    window.location.href = notification.action_url;
 }
 
 async function markAllRead() {
@@ -235,6 +291,54 @@ onBeforeUnmount(() => {
                 </header>
 
                 <div class="p-6">
+                    <section class="mb-6 rounded-2xl border border-gray-200 bg-gray-50/70 p-5 dark:border-gray-800 dark:bg-gray-950/60">
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                                <h2 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+                                    Preferences
+                                </h2>
+                                <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                    Control which categories create in-app notifications.
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                class="rounded-full bg-gray-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-gray-950 dark:hover:bg-gray-200"
+                                :disabled="savingPreferences"
+                                @click="savePreferences"
+                            >
+                                {{ savingPreferences ? 'Saving...' : 'Save preferences' }}
+                            </button>
+                        </div>
+
+                        <div class="mt-5 grid gap-3 sm:grid-cols-2">
+                            <label class="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm dark:border-gray-800 dark:bg-gray-900">
+                                <span class="font-medium text-gray-900 dark:text-white">Social graph</span>
+                                <input v-model="preferences.social_enabled" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500">
+                            </label>
+                            <label class="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm dark:border-gray-800 dark:bg-gray-900">
+                                <span class="font-medium text-gray-900 dark:text-white">Content</span>
+                                <input v-model="preferences.content_enabled" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500">
+                            </label>
+                            <label class="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm dark:border-gray-800 dark:bg-gray-900">
+                                <span class="font-medium text-gray-900 dark:text-white">Communication</span>
+                                <input v-model="preferences.communication_enabled" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500">
+                            </label>
+                            <label class="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm dark:border-gray-800 dark:bg-gray-900">
+                                <span class="font-medium text-gray-900 dark:text-white">Account and system</span>
+                                <input v-model="preferences.account_enabled" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500">
+                            </label>
+                        </div>
+
+                        <p v-if="preferenceSaved" class="mt-3 text-sm text-emerald-600 dark:text-emerald-400">
+                            Preferences updated.
+                        </p>
+                        <p v-if="preferenceError" class="mt-3 text-sm text-rose-600 dark:text-rose-400">
+                            {{ preferenceError }}
+                        </p>
+                    </section>
+
                     <div v-if="loading" class="rounded-2xl border border-dashed border-gray-300 px-6 py-12 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
                         Loading notifications...
                     </div>
@@ -284,6 +388,14 @@ onBeforeUnmount(() => {
                                     @click="markRead(notification.id)"
                                 >
                                     Mark read
+                                </button>
+                                <button
+                                    v-if="notification.action_url"
+                                    type="button"
+                                    class="shrink-0 rounded-full bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-600"
+                                    @click="openNotification(notification)"
+                                >
+                                    {{ notification.action_label ?? 'Open' }}
                                 </button>
                             </div>
                         </article>

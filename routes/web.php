@@ -11,6 +11,7 @@ use App\Http\Controllers\Identity\ProfileController;
 use App\Http\Controllers\Identity\RegisterController;
 use App\Http\Controllers\Notification\NotificationController;
 use App\Http\Controllers\Notification\NotificationPageController;
+use App\Http\Controllers\Notification\NotificationPreferenceController;
 use App\Http\Controllers\Content\PostController;
 use App\Http\Controllers\Content\PostReactionController;
 use App\Http\Controllers\SocialGraph\BlockController;
@@ -82,6 +83,7 @@ Route::middleware('auth')->group(function () {
     // Notifications
     Route::get('/notifications/center', [NotificationPageController::class, 'index'])->name('notifications.page');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::put('/notification-preferences', [NotificationPreferenceController::class, 'update'])->name('notifications.preferences.update');
     Route::put('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
     Route::put('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
 

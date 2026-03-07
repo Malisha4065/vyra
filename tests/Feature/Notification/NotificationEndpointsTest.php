@@ -1,6 +1,8 @@
 <?php
 
 use App\Domains\Identity\Models\User;
+use App\Domains\Notification\Models\UserNotificationPreference;
+use App\Domains\Notification\Repositories\NotificationPreferenceRepositoryInterface;
 use App\Domains\Notification\Models\UserNotification;
 use App\Domains\Notification\Repositories\UserNotificationRepositoryInterface;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -144,6 +146,52 @@ it('marks an owned notification as read via json endpoint', function () {
     $response->assertOk();
     $response->assertJsonPath('data.id', 'notification-1');
     $response->assertJsonPath('meta.unread_total', 2);
+});
+
+it('updates notification preferences via json endpoint', function () {
+    $user = new User();
+    $user->forceFill([
+        'id' => 'user-1',
+        'username' => 'owner',
+        'email' => 'owner@example.com',
+        'password' => 'secret',
+    ]);
+
+    $preference = new UserNotificationPreference();
+    $preference->forceFill([
+        'id' => 'preference-1',
+        'user_id' => 'user-1',
+        'social_enabled' => true,
+        'content_enabled' => false,
+        'communication_enabled' => true,
+        'account_enabled' => false,
+    ]);
+
+    $repository = mock(NotificationPreferenceRepositoryInterface::class);
+    $repository->shouldReceive('updateByUserId')
+        ->once()
+        ->with('user-1', [
+            'social_enabled' => true,
+            'content_enabled' => false,
+            'communication_enabled' => true,
+            'account_enabled' => false,
+        ])
+        ->andReturn($preference);
+
+    $this->app->instance(NotificationPreferenceRepositoryInterface::class, $repository);
+
+    $response = $this->actingAs($user)
+        ->withHeaders(['Accept' => 'application/json'])
+        ->put(route('notifications.preferences.update'), [
+            'social_enabled' => true,
+            'content_enabled' => false,
+            'communication_enabled' => true,
+            'account_enabled' => false,
+        ]);
+
+    $response->assertOk();
+    $response->assertJsonPath('data.content_enabled', false);
+    $response->assertJsonPath('data.account_enabled', false);
 });
 
 it('returns 404 when marking read for unknown notification', function () {

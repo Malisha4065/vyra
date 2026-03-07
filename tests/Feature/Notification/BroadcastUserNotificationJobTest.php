@@ -1,5 +1,8 @@
 <?php
 
+use App\Domains\Identity\Models\User;
+use App\Domains\Identity\Repositories\UserRepositoryInterface;
+use App\Domains\Notification\Actions\BuildUserNotificationPayloadAction;
 use App\Domains\Notification\Events\Broadcast\UserNotificationBroadcast;
 use App\Domains\Notification\Jobs\BroadcastUserNotificationJob;
 use App\Domains\Notification\Models\UserNotification;
@@ -23,13 +26,25 @@ it('broadcasts user notification payload when notification exists', function () 
     $repository = mock(UserNotificationRepositoryInterface::class);
     $repository->shouldReceive('findById')->once()->with('notification-1')->andReturn($notification);
 
+    $actor = new User();
+    $actor->forceFill([
+        'id' => 'user-2',
+        'username' => 'bob',
+        'email' => 'bob@example.com',
+        'password' => 'secret',
+    ]);
+
+    $userRepository = mock(UserRepositoryInterface::class);
+    $userRepository->shouldReceive('findById')->once()->with('user-2')->andReturn($actor);
+
     $job = new BroadcastUserNotificationJob('notification-1');
-    $job->handle($repository);
+    $job->handle($repository, new BuildUserNotificationPayloadAction($userRepository));
 
     Event::assertDispatched(UserNotificationBroadcast::class, function (UserNotificationBroadcast $event): bool {
         return $event->userId === 'user-1'
             && $event->notification['id'] === 'notification-1'
-            && $event->notification['type'] === 'social.followed';
+            && $event->notification['type'] === 'social.followed'
+            && $event->notification['action_url'] === route('profile.show', ['username' => 'bob']);
     });
 });
 
@@ -39,8 +54,11 @@ it('skips broadcasting when notification is missing', function () {
     $repository = mock(UserNotificationRepositoryInterface::class);
     $repository->shouldReceive('findById')->once()->with('missing-notification')->andReturn(null);
 
+    $userRepository = mock(UserRepositoryInterface::class);
+    $userRepository->shouldReceive('findById')->never();
+
     $job = new BroadcastUserNotificationJob('missing-notification');
-    $job->handle($repository);
+    $job->handle($repository, new BuildUserNotificationPayloadAction($userRepository));
 
     Event::assertNotDispatched(UserNotificationBroadcast::class);
 });

@@ -9,6 +9,10 @@ const props = defineProps({
         type: String,
         default: null,
     },
+    conversationId: {
+        type: String,
+        default: null,
+    },
 });
 
 const page = usePage();
@@ -528,6 +532,9 @@ watch(activeConversationId, async (conversationId) => {
 
 onMounted(async () => {
     await loadConversations(true);
+    if (props.conversationId && conversations.value.some((conversation) => conversation.id === props.conversationId)) {
+        activeConversationId.value = props.conversationId;
+    }
     await startDirectConversation(props.targetUserId);
 });
 

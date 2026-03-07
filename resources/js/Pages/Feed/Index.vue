@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 
@@ -7,6 +7,10 @@ const props = defineProps({
     feed: {
         type: Object,
         required: true,
+    },
+    focusPostId: {
+        type: String,
+        default: null,
     },
 });
 
@@ -31,6 +35,19 @@ watch(() => props.feed, (feed) => {
     items.value = feed.items ?? [];
     nextCursor.value = feed.next_cursor ?? null;
 }, { deep: true });
+
+async function scrollToFocusedPost() {
+    if (!props.focusPostId) {
+        return;
+    }
+
+    await nextTick();
+
+    document.querySelector(`[data-post-id="${props.focusPostId}"]`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+    });
+}
 
 function relativeTime(isoString) {
     if (!isoString) {
@@ -128,6 +145,14 @@ async function loadMore() {
         loadingMore.value = false;
     }
 }
+
+onMounted(() => {
+    scrollToFocusedPost();
+});
+
+watch(items, () => {
+    scrollToFocusedPost();
+}, { deep: true });
 </script>
 
 <template>
@@ -222,7 +247,9 @@ async function loadMore() {
                 <article
                     v-for="item in items"
                     :key="item.post_id"
+                    :data-post-id="item.post_id"
                     class="overflow-hidden rounded-[2rem] border border-gray-200 bg-white shadow-sm transition hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
+                    :class="item.post_id === focusPostId ? 'ring-2 ring-emerald-400 ring-offset-2 dark:ring-emerald-500 dark:ring-offset-gray-950' : ''"
                 >
                     <div class="flex items-start justify-between gap-4 px-6 py-5">
                         <div>

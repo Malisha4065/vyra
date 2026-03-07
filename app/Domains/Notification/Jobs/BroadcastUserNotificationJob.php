@@ -2,6 +2,7 @@
 
 namespace App\Domains\Notification\Jobs;
 
+use App\Domains\Notification\Actions\BuildUserNotificationPayloadAction;
 use App\Domains\Notification\Events\Broadcast\UserNotificationBroadcast;
 use App\Domains\Notification\Repositories\UserNotificationRepositoryInterface;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -15,7 +16,10 @@ class BroadcastUserNotificationJob implements ShouldQueue
         public readonly string $notificationId,
     ) {}
 
-    public function handle(UserNotificationRepositoryInterface $notificationRepository): void
+    public function handle(
+        UserNotificationRepositoryInterface $notificationRepository,
+        BuildUserNotificationPayloadAction $buildPayload,
+    ): void
     {
         $notification = $notificationRepository->findById($this->notificationId);
 
@@ -25,15 +29,7 @@ class BroadcastUserNotificationJob implements ShouldQueue
 
         event(new UserNotificationBroadcast(
             userId: $notification->user_id,
-            notification: [
-                'id' => $notification->id,
-                'type' => $notification->type,
-                'title' => $notification->title,
-                'body' => $notification->body,
-                'data' => $notification->data ?? [],
-                'read_at' => $notification->read_at?->toIso8601String(),
-                'created_at' => $notification->created_at?->toIso8601String(),
-            ],
+            notification: $buildPayload($notification),
         ));
     }
 }

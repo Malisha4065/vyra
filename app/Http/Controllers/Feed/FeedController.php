@@ -39,6 +39,7 @@ class FeedController extends Controller
 
         return Inertia::render('Feed/Index', [
             'feed' => $feed->toArray(),
+            'focusPostId' => $request->string('focus_post_id')->toString() ?: null,
         ]);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Notification;
 
 use App\Domains\Notification\Actions\ListUserNotificationsAction;
+use App\Domains\Notification\Actions\BuildUserNotificationPayloadAction;
 use App\Domains\Notification\Actions\MarkAllNotificationsReadAction;
 use App\Domains\Notification\Actions\MarkNotificationReadAction;
 use App\Domains\Notification\Data\ListUserNotificationsData;
@@ -21,6 +22,7 @@ class NotificationController extends Controller
     public function index(
         ListUserNotificationsAction $action,
         UserNotificationRepositoryInterface $notificationRepository,
+        BuildUserNotificationPayloadAction $buildPayload,
     ): JsonResponse {
         $this->authorize('viewAny', UserNotification::class);
 
@@ -31,9 +33,9 @@ class NotificationController extends Controller
         $notifications = $action($user, $data);
 
         return response()->json([
-            'data' => array_map(function ($notification): array {
+            'data' => array_map(function ($notification) use ($buildPayload): array {
                 if ($notification instanceof UserNotification) {
-                    return $this->serializeNotification($notification);
+                    return $buildPayload($notification);
                 }
 
                 return (array) $notification;
@@ -53,6 +55,7 @@ class NotificationController extends Controller
         string $notification,
         MarkNotificationReadAction $action,
         UserNotificationRepositoryInterface $notificationRepository,
+        BuildUserNotificationPayloadAction $buildPayload,
     ): JsonResponse|RedirectResponse {
         $data = MarkNotificationReadData::from([
             'notification_id' => $notification,
@@ -68,7 +71,7 @@ class NotificationController extends Controller
 
         if ($request->expectsJson()) {
             return response()->json([
-                'data' => $this->serializeNotification($updatedNotification),
+                'data' => $buildPayload($updatedNotification),
                 'meta' => [
                     'unread_total' => $notificationRepository->unreadCount($updatedNotification->user_id),
                 ],
@@ -104,21 +107,5 @@ class NotificationController extends Controller
         }
 
         return back()->with('success', "{$updated} notifications marked as read.");
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function serializeNotification(UserNotification $notification): array
-    {
-        return [
-            'id' => $notification->id,
-            'type' => $notification->type,
-            'title' => $notification->title,
-            'body' => $notification->body,
-            'data' => $notification->data ?? [],
-            'read_at' => $notification->read_at?->toIso8601String(),
-            'created_at' => $notification->created_at?->toIso8601String(),
-        ];
     }
 }
