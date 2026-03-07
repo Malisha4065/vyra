@@ -8,6 +8,13 @@ class FeedPostData extends Data
 {
     /**
      * @param array{comments: int, reactions: int} $counts
+     * @param array<int, array{
+     *   id: string|null,
+     *   url: string|null,
+     *   kind: string|null,
+     *   mime_type: string|null,
+     *   original_name: string|null
+     * }> $media
      */
     public function __construct(
         public readonly string $id,
@@ -16,5 +23,6 @@ class FeedPostData extends Data
         public readonly ?string $published_at,
         public readonly FeedAuthorData $author,
         public readonly array $counts,
+        public readonly array $media,
     ) {}
 }

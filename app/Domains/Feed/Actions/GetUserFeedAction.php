@@ -122,6 +122,7 @@ class GetUserFeedAction
                         username: $post['author']['username'],
                     ),
                     counts: $post['counts'],
+                    media: $post['media'],
                 ),
             );
         }, $items);
@@ -195,6 +196,15 @@ class GetUserFeedAction
                 'comments' => $commentsCount,
                 'reactions' => $reactionsCount,
             ],
+            'media' => $post->relationLoaded('media')
+                ? $post->media->map(static fn ($media): array => [
+                    'id' => $media->id,
+                    'url' => $media->url,
+                    'kind' => $media->kind,
+                    'mime_type' => $media->mime_type,
+                    'original_name' => $media->original_name,
+                ])->values()->all()
+                : [],
         ];
     }
 }

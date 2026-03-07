@@ -2,6 +2,7 @@
 
 namespace App\Domains\Content\Jobs;
 
+use App\Domains\Content\Repositories\PostRepositoryInterface;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -16,8 +17,14 @@ class UpdatePostReactionSearchIndexJob implements ShouldQueue
         public readonly string $action,
     ) {}
 
-    public function handle(): void
+    public function handle(PostRepositoryInterface $postRepository): void
     {
-        // Search indexing will be implemented when Scout projections are expanded.
+        $post = $postRepository->findById($this->postId);
+
+        if ($post === null) {
+            return;
+        }
+
+        $post->searchable();
     }
 }

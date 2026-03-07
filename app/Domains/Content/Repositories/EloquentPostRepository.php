@@ -26,7 +26,10 @@ class EloquentPostRepository implements PostRepositoryInterface
             foreach ($media as $index => $item) {
                 $this->postMediaModel->create([
                     'post_id' => $post->id,
-                    'url' => $item['url'],
+                    'url' => $item['url'] ?? null,
+                    'disk' => $item['disk'] ?? null,
+                    'path' => $item['path'] ?? null,
+                    'original_name' => $item['original_name'] ?? null,
                     'mime_type' => $item['mime_type'] ?? null,
                     'size_bytes' => $item['size_bytes'] ?? null,
                     'kind' => $item['kind'] ?? null,
@@ -71,6 +74,16 @@ class EloquentPostRepository implements PostRepositoryInterface
         ]);
 
         return $this->findById($post->id) ?? $post;
+    }
+
+    public function markMediaProcessed(string $postId): int
+    {
+        return $this->postMediaModel
+            ->where('post_id', $postId)
+            ->whereNull('processed_at')
+            ->update([
+                'processed_at' => now(),
+            ]);
     }
 
     public function delete(Post $post): void

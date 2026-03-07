@@ -68,6 +68,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/users/{user}/unmute', [MuteController::class, 'destroy'])->name('user.unmute');
 
     // Content
+    Route::post('/posts/media', [PostController::class, 'uploadMedia'])->name('posts.media.store');
     Route::post('/posts', [PostController::class, 'store'])->name('posts.store');
     Route::put('/posts/{post}', [PostController::class, 'update'])->name('posts.update');
     Route::delete('/posts/{post}', [PostController::class, 'destroy'])->name('posts.destroy');

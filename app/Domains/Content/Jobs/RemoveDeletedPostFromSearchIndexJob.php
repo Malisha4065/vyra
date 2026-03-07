@@ -2,6 +2,7 @@
 
 namespace App\Domains\Content\Jobs;
 
+use App\Domains\Content\Models\Post;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -15,6 +16,11 @@ class RemoveDeletedPostFromSearchIndexJob implements ShouldQueue
 
     public function handle(): void
     {
-        // Search de-indexing will be implemented when Scout projections are expanded.
+        $post = new Post();
+        $post->forceFill([
+            'id' => $this->postId,
+        ]);
+
+        $post->unsearchable();
     }
 }

@@ -7,7 +7,15 @@ use App\Domains\Content\Models\Post;
 interface PostRepositoryInterface
 {
     /**
-     * @param array<int, array{url: string, mime_type?: string|null, size_bytes?: int|null, kind?: string|null}> $media
+     * @param array<int, array{
+     *   url?: string|null,
+     *   path?: string|null,
+     *   disk?: string|null,
+     *   original_name?: string|null,
+     *   mime_type?: string|null,
+     *   size_bytes?: int|null,
+     *   kind?: string|null
+     * }> $media
      */
     public function publish(string $userId, ?string $body, array $media): Post;
 
@@ -20,6 +28,8 @@ interface PostRepositoryInterface
     public function findByIds(array $ids): array;
 
     public function updateBody(Post $post, string $body): Post;
+
+    public function markMediaProcessed(string $postId): int;
 
     public function delete(Post $post): void;
 }

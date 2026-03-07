@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Content;
 use App\Domains\Content\Actions\PublishPostAction;
 use App\Domains\Content\Actions\DeletePostAction;
 use App\Domains\Content\Actions\UpdatePostAction;
+use App\Domains\Content\Actions\UploadPostMediaAction;
 use App\Domains\Content\Data\DeletePostData;
 use App\Domains\Content\Data\PublishPostData;
 use App\Domains\Content\Data\UpdatePostData;
+use App\Domains\Content\Data\UploadPostMediaData;
 use App\Domains\Content\Exceptions\EmptyPostException;
 use App\Domains\Content\Models\Post;
 use App\Domains\Content\Repositories\PostRepositoryInterface;
@@ -17,6 +19,23 @@ use Illuminate\Support\Facades\Auth;
 
 class PostController extends Controller
 {
+    public function uploadMedia(
+        UploadPostMediaAction $action,
+    ): \Illuminate\Http\JsonResponse {
+        $this->authorize('create', Post::class);
+
+        $data = UploadPostMediaData::from([
+            'file' => request()->file('file'),
+        ]);
+
+        /** @var \App\Domains\Identity\Models\User $user */
+        $user = Auth::user();
+
+        return response()->json([
+            'data' => $action($user, $data),
+        ], 201);
+    }
+
     public function store(
         PublishPostData $data,
         PublishPostAction $action,

@@ -26,8 +26,10 @@ use App\Domains\Content\Policies\PostPolicy;
 use App\Domains\Content\Policies\PostReactionPolicy;
 use App\Domains\Content\Repositories\CommentRepositoryInterface;
 use App\Domains\Content\Repositories\EloquentCommentRepository;
+use App\Domains\Content\Repositories\FlysystemPostMediaStorageRepository;
 use App\Domains\Content\Repositories\EloquentPostRepository;
 use App\Domains\Content\Repositories\EloquentPostReactionRepository;
+use App\Domains\Content\Repositories\PostMediaStorageInterface;
 use App\Domains\Content\Repositories\PostRepositoryInterface;
 use App\Domains\Content\Repositories\PostReactionRepositoryInterface;
 use Illuminate\Support\Facades\Event;
@@ -41,6 +43,7 @@ class ContentServiceProvider extends ServiceProvider
         $this->app->bind(PostRepositoryInterface::class, EloquentPostRepository::class);
         $this->app->bind(CommentRepositoryInterface::class, EloquentCommentRepository::class);
         $this->app->bind(PostReactionRepositoryInterface::class, EloquentPostReactionRepository::class);
+        $this->app->bind(PostMediaStorageInterface::class, FlysystemPostMediaStorageRepository::class);
     }
 
     public function boot(): void

@@ -22,6 +22,6 @@ class UpdatePublishedPostSearchIndexJob implements ShouldQueue
             return;
         }
 
-        // Search indexing (Scout + Meilisearch) will be implemented here.
+        $post->searchable();
     }
 }

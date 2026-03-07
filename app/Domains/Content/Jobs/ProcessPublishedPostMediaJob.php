@@ -22,6 +22,6 @@ class ProcessPublishedPostMediaJob implements ShouldQueue
             return;
         }
 
-        // Media processing (resizing/transcoding) will be implemented here.
+        $postRepository->markMediaProcessed($post->id);
     }
 }

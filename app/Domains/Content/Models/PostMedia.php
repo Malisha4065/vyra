@@ -13,6 +13,9 @@ class PostMedia extends Model
     protected $fillable = [
         'post_id',
         'url',
+        'disk',
+        'path',
+        'original_name',
         'mime_type',
         'size_bytes',
         'kind',

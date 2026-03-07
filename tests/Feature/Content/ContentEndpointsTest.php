@@ -1,11 +1,13 @@
 <?php
 
 use App\Domains\Content\Repositories\CommentRepositoryInterface;
+use App\Domains\Content\Repositories\PostMediaStorageInterface;
 use App\Domains\Content\Repositories\PostReactionRepositoryInterface;
 use App\Domains\Content\Repositories\PostRepositoryInterface;
 use App\Domains\Content\Models\Comment;
 use App\Domains\Content\Models\Post;
 use App\Domains\Identity\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Event;
 
@@ -164,4 +166,43 @@ it('returns reaction summary via endpoint', function () {
             'love' => 1,
         ],
     ]);
+});
+
+it('uploads post media via endpoint', function () {
+    Event::fake();
+
+    $user = new User();
+    $user->forceFill([
+        'id' => 'user-1',
+        'username' => 'owner',
+        'email' => 'owner@example.com',
+        'password' => 'secret',
+    ]);
+
+    $file = UploadedFile::fake()->image('photo.jpg');
+
+    $storage = mock(PostMediaStorageInterface::class);
+    $storage->shouldReceive('storeUpload')
+        ->once()
+        ->with($file, 'user-1')
+        ->andReturn([
+            'disk' => 'local',
+            'path' => 'posts/user-1/staging/2026/03/07/photo.jpg',
+            'url' => 'http://localhost/storage/posts/user-1/staging/2026/03/07/photo.jpg',
+            'original_name' => 'photo.jpg',
+            'mime_type' => 'image/jpeg',
+            'size_bytes' => 2048,
+            'kind' => 'image',
+        ]);
+
+    $this->app->instance(PostMediaStorageInterface::class, $storage);
+
+    $response = $this->actingAs($user)
+        ->post(route('posts.media.store'), [
+            'file' => $file,
+        ]);
+
+    $response->assertCreated();
+    $response->assertJsonPath('data.kind', 'image');
+    $response->assertJsonPath('data.original_name', 'photo.jpg');
 });
