@@ -34,6 +34,7 @@ class HandleInertiaRequests extends Middleware
                     'id' => $request->user()->id,
                     'username' => $request->user()->username,
                     'email' => $request->user()->email,
+                    'email_verified_at' => $request->user()->email_verified_at?->toIso8601String(),
                 ] : null,
             ],
             'flash' => [

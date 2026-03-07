@@ -3,10 +3,14 @@
 namespace App\Domains\Identity;
 
 use App\Domains\Identity\Events\AccountDeleted;
+use App\Domains\Identity\Events\EmailVerificationRequested;
+use App\Domains\Identity\Events\PasswordResetLinkRequested;
 use App\Domains\Identity\Events\ProfileUpdated;
 use App\Domains\Identity\Events\UserRegistered;
 use App\Domains\Identity\Listeners\CreateUserProfileListener;
 use App\Domains\Identity\Listeners\QueueRemoveDeletedUserSearchIndexListener;
+use App\Domains\Identity\Listeners\QueueSendEmailVerificationListener;
+use App\Domains\Identity\Listeners\QueueSendPasswordResetLinkListener;
 use App\Domains\Identity\Listeners\QueueUserSearchIndexListener;
 use App\Domains\Identity\Models\UserProfile;
 use App\Domains\Identity\Policies\UserProfilePolicy;
@@ -31,6 +35,9 @@ class IdentityServiceProvider extends ServiceProvider
     {
         // Event → Listener mappings
         Event::listen(UserRegistered::class, CreateUserProfileListener::class);
+        Event::listen(UserRegistered::class, QueueSendEmailVerificationListener::class);
+        Event::listen(EmailVerificationRequested::class, QueueSendEmailVerificationListener::class);
+        Event::listen(PasswordResetLinkRequested::class, QueueSendPasswordResetLinkListener::class);
         Event::listen(ProfileUpdated::class, QueueUserSearchIndexListener::class);
         Event::listen(AccountDeleted::class, QueueRemoveDeletedUserSearchIndexListener::class);
 

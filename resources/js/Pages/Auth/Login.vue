@@ -71,6 +71,12 @@ const submit = () => {
                 <span v-if="form.processing">Signing in...</span>
                 <span v-else>Sign In</span>
             </button>
+
+            <p class="text-center text-sm text-gray-400">
+                <a :href="route('password.request')" class="font-medium text-primary-400 hover:text-primary-300 transition-colors">
+                    Forgot your password?
+                </a>
+            </p>
         </form>
 
         <!-- Register link -->

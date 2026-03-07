@@ -106,6 +106,23 @@ onBeforeUnmount(() => {
 
         <!-- Main Content -->
         <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div
+                v-if="authUserId && !$page.props.auth?.user?.email_verified_at"
+                class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/50 dark:text-amber-100"
+            >
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p>
+                        Verify your email address to secure the account and complete onboarding.
+                    </p>
+                    <a
+                        :href="route('verification.notice')"
+                        class="inline-flex rounded-full border border-amber-300 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-amber-800 transition hover:border-amber-400 dark:border-amber-700 dark:text-amber-200"
+                    >
+                        Verify now
+                    </a>
+                </div>
+            </div>
+
             <slot />
         </main>
     </div>

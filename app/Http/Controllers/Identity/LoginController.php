@@ -22,11 +22,15 @@ class LoginController extends Controller
         LoginUserAction $action,
     ): RedirectResponse {
         try {
-            $action($data);
+            $user = $action($data);
         } catch (InvalidCredentialsException $e) {
             return back()->withErrors([
                 'email' => $e->getMessage(),
             ]);
+        }
+
+        if (! $user->hasVerifiedEmail()) {
+            return redirect()->route('verification.notice');
         }
 
         return redirect()->intended(route('feed'));

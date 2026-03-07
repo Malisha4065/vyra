@@ -6,10 +6,13 @@ use App\Http\Controllers\Communication\ConversationController;
 use App\Http\Controllers\Communication\ConversationMessageController;
 use App\Http\Controllers\Communication\MessagePageController;
 use App\Http\Controllers\Feed\FeedController;
+use App\Http\Controllers\Identity\EmailVerificationController;
+use App\Http\Controllers\Identity\ForgotPasswordController;
 use App\Http\Controllers\Identity\LoginController;
 use App\Http\Controllers\Identity\LogoutController;
 use App\Http\Controllers\Identity\ProfileController;
 use App\Http\Controllers\Identity\RegisterController;
+use App\Http\Controllers\Identity\ResetPasswordController;
 use App\Http\Controllers\Identity\UserSearchController;
 use App\Http\Controllers\Notification\NotificationController;
 use App\Http\Controllers\Notification\NotificationPageController;
@@ -30,10 +33,19 @@ use Illuminate\Support\Facades\Route;
 */
 Route::middleware('guest')->group(function () {
     Route::get('/register', [RegisterController::class, 'create'])->name('register');
-    Route::post('/register', [RegisterController::class, 'store']);
+    Route::post('/register', [RegisterController::class, 'store'])->middleware('throttle:auth.register');
 
     Route::get('/login', [LoginController::class, 'create'])->name('login');
-    Route::post('/login', [LoginController::class, 'store']);
+    Route::post('/login', [LoginController::class, 'store'])->middleware('throttle:auth.login');
+
+    Route::get('/forgot-password', [ForgotPasswordController::class, 'create'])->name('password.request');
+    Route::post('/forgot-password', [ForgotPasswordController::class, 'store'])
+        ->middleware('throttle:auth.password.email')
+        ->name('password.email');
+    Route::get('/reset-password/{token}', [ResetPasswordController::class, 'create'])->name('password.reset');
+    Route::post('/reset-password', [ResetPasswordController::class, 'store'])
+        ->middleware('throttle:auth.password.reset')
+        ->name('password.update');
 });
 
 /*
@@ -42,6 +54,14 @@ Route::middleware('guest')->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware('auth')->group(function () {
+    Route::get('/email/verify', [EmailVerificationController::class, 'notice'])->name('verification.notice');
+    Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
+        ->middleware(['signed', 'throttle:6,1'])
+        ->name('verification.verify');
+    Route::post('/email/verification-notification', [EmailVerificationController::class, 'resend'])
+        ->middleware('throttle:auth.verification.resend')
+        ->name('verification.send');
+
     Route::post('/logout', [LogoutController::class, 'destroy'])->name('logout');
 
     // Feed

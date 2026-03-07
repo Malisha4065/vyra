@@ -25,6 +25,7 @@ class RegisterController extends Controller
 
         Auth::login($user);
 
-        return redirect()->route('feed')->with('success', 'Welcome to Vyra!');
+        return redirect()->route('verification.notice')
+            ->with('success', 'Account created. Verify your email to continue.');
     }
 }
