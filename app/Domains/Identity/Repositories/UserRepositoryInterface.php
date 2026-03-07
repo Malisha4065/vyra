@@ -21,4 +21,9 @@ interface UserRepositoryInterface
     public function existsByUsername(string $username): bool;
 
     public function existsByEmail(string $email): bool;
+
+    /**
+     * @return array<int, User>
+     */
+    public function searchDiscoverable(string $query, int $limit = 10): array;
 }

@@ -48,6 +48,11 @@ interface PostRepositoryInterface
      */
     public function getTrendingHashtags(int $limit = 10): array;
 
+    /**
+     * @return array<int, Post>
+     */
+    public function getRecentPublishedByAuthor(string $authorId, int $limit = 8): array;
+
     public function updateBody(Post $post, string $body): Post;
 
     public function markMediaProcessed(string $postId): int;

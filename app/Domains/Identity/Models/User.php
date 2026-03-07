@@ -13,10 +13,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Scout\Searchable;
 
 class User extends Authenticatable
 {
-    use HasFactory, HasUuids, Notifiable;
+    use HasFactory, HasUuids, Notifiable, Searchable;
 
     /**
      * The attributes that are mass assignable.
@@ -145,5 +146,32 @@ class User extends Authenticatable
     public function notificationsFeed(): HasMany
     {
         return $this->hasMany(UserNotification::class);
+    }
+
+    public function searchableAs(): string
+    {
+        return 'users';
+    }
+
+    public function shouldBeSearchable(): bool
+    {
+        return $this->username !== '';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        $profile = $this->relationLoaded('profile') ? $this->profile : null;
+
+        return [
+            'id' => $this->id,
+            'username' => $this->username,
+            'display_name' => $profile?->display_name,
+            'bio' => $profile?->bio,
+            'location' => $profile?->location,
+            'is_private' => (bool) ($profile?->is_private ?? false),
+        ];
     }
 }

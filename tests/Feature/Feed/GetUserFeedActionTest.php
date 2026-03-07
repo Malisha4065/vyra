@@ -1,5 +1,6 @@
 <?php
 
+use App\Domains\Feed\Actions\BuildFeedPersonalizationSignalsAction;
 use App\Domains\Feed\Actions\CalculateFeedItemScoreAction;
 use App\Domains\Feed\Actions\GetUserFeedAction;
 use App\Domains\Feed\Data\GetUserFeedData;
@@ -69,6 +70,13 @@ it('merges cached and hybrid feed entries ordered by score', function () {
     $muteRepository->shouldReceive('isMuting')->once()->with('user-1', 'author-9')->andReturn(false);
     $muteRepository->shouldReceive('isMuting')->once()->with('user-1', 'author-1')->andReturn(false);
 
+    $personalization = mock(BuildFeedPersonalizationSignalsAction::class);
+    $personalization->shouldReceive('__invoke')->once()->with('user-1')->andReturn([
+        'viewer_id' => 'user-1',
+        'preferred_hashtags' => [],
+        'prefers_media' => false,
+    ]);
+
     $action = new GetUserFeedAction(
         $feedCacheRepository,
         $hybridFeedRepository,
@@ -76,6 +84,7 @@ it('merges cached and hybrid feed entries ordered by score', function () {
         $postRepository,
         $blockRepository,
         $muteRepository,
+        $personalization,
         new CalculateFeedItemScoreAction(),
     );
 
@@ -132,6 +141,13 @@ it('uses ranked cursor when stale ids reduce hydrated result size', function () 
     $muteRepository = mock(MuteRepositoryInterface::class);
     $muteRepository->shouldReceive('isMuting')->once()->with('user-1', 'author-1')->andReturn(false);
 
+    $personalization = mock(BuildFeedPersonalizationSignalsAction::class);
+    $personalization->shouldReceive('__invoke')->once()->with('user-1')->andReturn([
+        'viewer_id' => 'user-1',
+        'preferred_hashtags' => [],
+        'prefers_media' => false,
+    ]);
+
     $action = new GetUserFeedAction(
         $feedCacheRepository,
         $hybridFeedRepository,
@@ -139,6 +155,7 @@ it('uses ranked cursor when stale ids reduce hydrated result size', function () 
         $postRepository,
         $blockRepository,
         $muteRepository,
+        $personalization,
         new CalculateFeedItemScoreAction(),
     );
 
@@ -198,6 +215,13 @@ it('filters out muted and blocked authors from hydrated feed items', function ()
     $blockRepository->shouldReceive('eitherBlocked')->once()->with('user-1', 'author-blocked')->andReturn(true);
     $blockRepository->shouldReceive('eitherBlocked')->once()->with('user-1', 'author-visible')->andReturn(false);
 
+    $personalization = mock(BuildFeedPersonalizationSignalsAction::class);
+    $personalization->shouldReceive('__invoke')->once()->with('user-1')->andReturn([
+        'viewer_id' => 'user-1',
+        'preferred_hashtags' => [],
+        'prefers_media' => false,
+    ]);
+
     $action = new GetUserFeedAction(
         $feedCacheRepository,
         $hybridFeedRepository,
@@ -205,6 +229,7 @@ it('filters out muted and blocked authors from hydrated feed items', function ()
         $postRepository,
         $blockRepository,
         $muteRepository,
+        $personalization,
         new CalculateFeedItemScoreAction(),
     );
 
@@ -258,6 +283,13 @@ it('boosts highly engaged posts in top mode', function () {
     $muteRepository->shouldReceive('isMuting')->once()->with('user-1', 'author-1')->andReturn(false);
     $muteRepository->shouldReceive('isMuting')->once()->with('user-1', 'author-2')->andReturn(false);
 
+    $personalization = mock(BuildFeedPersonalizationSignalsAction::class);
+    $personalization->shouldReceive('__invoke')->once()->with('user-1')->andReturn([
+        'viewer_id' => 'user-1',
+        'preferred_hashtags' => [],
+        'prefers_media' => false,
+    ]);
+
     $action = new GetUserFeedAction(
         $feedCacheRepository,
         $hybridFeedRepository,
@@ -265,6 +297,7 @@ it('boosts highly engaged posts in top mode', function () {
         $postRepository,
         $blockRepository,
         $muteRepository,
+        $personalization,
         new CalculateFeedItemScoreAction(),
     );
 
@@ -275,4 +308,71 @@ it('boosts highly engaged posts in top mode', function () {
     ]));
 
     expect($result->items[0]->post_id)->toBe('post-old');
+});
+
+it('boosts posts that match the viewer hashtag interests', function () {
+    $feedCacheRepository = mock(FeedCacheRepositoryInterface::class);
+    $feedCacheRepository->shouldReceive('getUserFeed')
+        ->once()
+        ->with('user-1', 6, null)
+        ->andReturn([
+            ['post_id' => 'post-generic', 'score' => 1000],
+            ['post_id' => 'post-interest', 'score' => 950],
+        ]);
+
+    $followRepository = mock(FollowRepositoryInterface::class);
+    $followRepository->shouldReceive('getFollowingIds')->once()->with('user-1')->andReturn([]);
+
+    $hybridFeedRepository = mock(HybridFeedRepositoryInterface::class);
+    $hybridFeedRepository->shouldReceive('filterHighFollowerAuthors')->once()->with([])->andReturn([]);
+    $hybridFeedRepository->shouldReceive('getRecentPostsForHighFollowerAuthors')->once()->with([], 10, null)->andReturn([]);
+
+    $postGeneric = new Post();
+    $postGeneric->forceFill(['id' => 'post-generic', 'user_id' => 'author-1', 'body' => 'General update', 'published_at' => now()]);
+    $postGeneric->setRelation('comments', collect());
+    $postGeneric->setRelation('reactions', collect());
+    $postGeneric->setRelation('media', collect());
+
+    $postInterest = new Post();
+    $postInterest->forceFill(['id' => 'post-interest', 'user_id' => 'author-2', 'body' => 'Shipping #laravel search', 'published_at' => now()->subMinute()]);
+    $postInterest->setRelation('comments', collect());
+    $postInterest->setRelation('reactions', collect());
+    $postInterest->setRelation('media', collect());
+
+    $postRepository = mock(PostRepositoryInterface::class);
+    $postRepository->shouldReceive('findByIds')->once()->with(['post-generic', 'post-interest'])->andReturn([$postGeneric, $postInterest]);
+
+    $blockRepository = mock(BlockRepositoryInterface::class);
+    $blockRepository->shouldReceive('eitherBlocked')->once()->with('user-1', 'author-1')->andReturn(false);
+    $blockRepository->shouldReceive('eitherBlocked')->once()->with('user-1', 'author-2')->andReturn(false);
+
+    $muteRepository = mock(MuteRepositoryInterface::class);
+    $muteRepository->shouldReceive('isMuting')->once()->with('user-1', 'author-1')->andReturn(false);
+    $muteRepository->shouldReceive('isMuting')->once()->with('user-1', 'author-2')->andReturn(false);
+
+    $personalization = mock(BuildFeedPersonalizationSignalsAction::class);
+    $personalization->shouldReceive('__invoke')->once()->with('user-1')->andReturn([
+        'viewer_id' => 'user-1',
+        'preferred_hashtags' => ['laravel'],
+        'prefers_media' => false,
+    ]);
+
+    $action = new GetUserFeedAction(
+        $feedCacheRepository,
+        $hybridFeedRepository,
+        $followRepository,
+        $postRepository,
+        $blockRepository,
+        $muteRepository,
+        $personalization,
+        new CalculateFeedItemScoreAction(),
+    );
+
+    $result = $action(GetUserFeedData::from([
+        'user_id' => 'user-1',
+        'limit' => 2,
+        'mode' => 'top',
+    ]));
+
+    expect($result->items[0]->post_id)->toBe('post-interest');
 });

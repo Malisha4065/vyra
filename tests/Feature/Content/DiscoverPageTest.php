@@ -31,6 +31,16 @@ it('renders the discover page with search results and trends', function () {
                     'media' => [],
                 ],
             ],
+            'users' => [
+                [
+                    'id' => 'user-2',
+                    'username' => 'alice',
+                    'display_name' => 'Alice',
+                    'bio' => null,
+                    'avatar_url' => null,
+                    'is_private' => false,
+                ],
+            ],
             'trending_hashtags' => [
                 ['tag' => 'laravel', 'count' => 4],
             ],
@@ -49,5 +59,6 @@ it('renders the discover page with search results and trends', function () {
         ->component('Content/Discover')
         ->where('query', 'laravel')
         ->where('results.0.id', 'post-1')
+        ->where('users.0.username', 'alice')
         ->where('trendingHashtags.0.tag', 'laravel'));
 });

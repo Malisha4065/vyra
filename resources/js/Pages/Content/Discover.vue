@@ -7,6 +7,10 @@ const props = defineProps({
         type: Array,
         required: true,
     },
+    users: {
+        type: Array,
+        required: true,
+    },
     trendingHashtags: {
         type: Array,
         required: true,
@@ -175,6 +179,43 @@ function submitSearch() {
             </section>
 
             <aside class="space-y-4">
+                <section class="rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                    <p class="text-xs font-semibold uppercase tracking-[0.28em] text-gray-500 dark:text-gray-400">
+                        People
+                    </p>
+                    <div v-if="users.length === 0" class="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                        No matching profiles.
+                    </div>
+                    <div v-else class="mt-4 space-y-3">
+                        <a
+                            v-for="user in users"
+                            :key="user.id"
+                            :href="route('profile.show', { username: user.username })"
+                            class="block rounded-2xl border border-gray-200 px-4 py-3 transition hover:border-sky-300 hover:bg-sky-50 dark:border-gray-800 dark:hover:border-sky-700 dark:hover:bg-sky-950/30"
+                        >
+                            <div class="flex items-center justify-between gap-3">
+                                <div>
+                                    <p class="font-semibold text-gray-900 dark:text-white">
+                                        {{ user.display_name || user.username }}
+                                    </p>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                                        @{{ user.username }}
+                                    </p>
+                                </div>
+                                <span
+                                    v-if="user.is_private"
+                                    class="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                                >
+                                    Private
+                                </span>
+                            </div>
+                            <p v-if="user.bio" class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                {{ user.bio }}
+                            </p>
+                        </a>
+                    </div>
+                </section>
+
                 <section class="rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                     <p class="text-xs font-semibold uppercase tracking-[0.28em] text-gray-500 dark:text-gray-400">
                         Trending tags

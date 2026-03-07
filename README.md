@@ -14,7 +14,7 @@
 | **Queue Dashboard** | Laravel Horizon |
 | **WebSockets** | Laravel Reverb |
 | **Search** | Laravel Scout + Meilisearch |
-| **File Storage** | Amazon S3 (via Flysystem) |
+| **File Storage** | S3-compatible object storage (MinIO supported via Flysystem `s3` driver) |
 | **Testing** | Pest PHP |
 
 ## Architecture
@@ -100,6 +100,18 @@ Vyra uses a **fan-out on write** strategy with a hybrid threshold:
 - Feed reads use `ZREVRANGEBYSCORE` with cursor-based pagination for sub-10ms response times.
 
 See [docs/feed-architecture.md](docs/feed-architecture.md) for the full technical specification.
+
+## Queue Operations
+
+Horizon supervisors are split by workload:
+
+- `notifications`, `communication`: realtime delivery
+- `feed`: fan-out and rebuild jobs
+- `search`: Scout / Meilisearch indexing
+- `media`: media processing
+- `default`: everything else
+
+See [docs/queue-operations.md](docs/queue-operations.md) for queue priorities and worker guidance.
 
 ## License
 

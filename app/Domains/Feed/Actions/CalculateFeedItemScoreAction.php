@@ -6,7 +6,10 @@ use App\Domains\Content\Models\Post;
 
 class CalculateFeedItemScoreAction
 {
-    public function __invoke(Post $post, int $sourceScore, string $mode = 'top'): int
+    /**
+     * @param array{viewer_id?: string, preferred_hashtags?: array<int, string>, prefers_media?: bool} $signals
+     */
+    public function __invoke(Post $post, int $sourceScore, string $mode = 'top', array $signals = []): int
     {
         if ($mode === 'latest') {
             return $sourceScore;
@@ -21,6 +24,22 @@ class CalculateFeedItemScoreAction
             + (min($reactionsCount, 50) * 120)
             + (min($mediaCount, 4) * 90);
 
-        return $publishedTimestamp + $engagementBoost;
+        $viewerAffinityBoost = 0;
+
+        if (($signals['viewer_id'] ?? null) === $post->user_id) {
+            $viewerAffinityBoost += 900;
+        }
+
+        $preferredHashtags = $signals['preferred_hashtags'] ?? [];
+        $postHashtags = $post->toSearchableArray()['hashtags'] ?? [];
+        $overlapCount = count(array_intersect($preferredHashtags, $postHashtags));
+
+        $viewerAffinityBoost += $overlapCount * 180;
+
+        if (($signals['prefers_media'] ?? false) && $mediaCount > 0) {
+            $viewerAffinityBoost += 140;
+        }
+
+        return $publishedTimestamp + $engagementBoost + $viewerAffinityBoost;
     }
 }

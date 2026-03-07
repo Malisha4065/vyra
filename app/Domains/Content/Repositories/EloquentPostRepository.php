@@ -160,6 +160,18 @@ class EloquentPostRepository implements PostRepositoryInterface
         return $results;
     }
 
+    public function getRecentPublishedByAuthor(string $authorId, int $limit = 8): array
+    {
+        return $this->postModel
+            ->with(['media'])
+            ->where('user_id', $authorId)
+            ->whereNotNull('published_at')
+            ->orderByDesc('published_at')
+            ->limit($limit)
+            ->get()
+            ->all();
+    }
+
     public function updateBody(Post $post, string $body): Post
     {
         $post->update([

@@ -3,6 +3,7 @@
 namespace App\Domains\Identity\Repositories;
 
 use App\Domains\Identity\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 
 class EloquentUserRepository implements UserRepositoryInterface
 {
@@ -50,5 +51,37 @@ class EloquentUserRepository implements UserRepositoryInterface
     public function existsByEmail(string $email): bool
     {
         return $this->model->where('email', strtolower($email))->exists();
+    }
+
+    public function searchDiscoverable(string $query, int $limit = 10): array
+    {
+        $term = mb_strtolower(trim($query));
+
+        if ($term === '') {
+            return [];
+        }
+
+        if (! in_array(config('scout.driver'), ['null', 'collection', null], true)) {
+            return $this->model->search($query)
+                ->take($limit)
+                ->get()
+                ->load('profile')
+                ->all();
+        }
+
+        $like = '%'.$term.'%';
+
+        return $this->model
+            ->with('profile')
+            ->where(function (Builder $builder) use ($like): void {
+                $builder->whereRaw('LOWER(username) LIKE ?', [$like])
+                    ->orWhereHas('profile', function (Builder $profileQuery) use ($like): void {
+                        $profileQuery->whereRaw('LOWER(display_name) LIKE ?', [$like])
+                            ->orWhereRaw('LOWER(bio) LIKE ?', [$like]);
+                    });
+            })
+            ->limit($limit)
+            ->get()
+            ->all();
     }
 }

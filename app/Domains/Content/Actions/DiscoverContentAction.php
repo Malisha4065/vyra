@@ -5,15 +5,21 @@ namespace App\Domains\Content\Actions;
 use App\Domains\Content\Data\SearchContentData;
 use App\Domains\Content\Models\Post;
 use App\Domains\Content\Repositories\PostRepositoryInterface;
+use App\Domains\Identity\Actions\BuildUserSearchPayloadAction;
+use App\Domains\Identity\Repositories\UserRepositoryInterface;
+use App\Domains\SocialGraph\Repositories\BlockRepositoryInterface;
 
 class DiscoverContentAction
 {
     public function __construct(
         private readonly PostRepositoryInterface $postRepository,
+        private readonly UserRepositoryInterface $userRepository,
+        private readonly BlockRepositoryInterface $blockRepository,
+        private readonly BuildUserSearchPayloadAction $buildUserPayload,
     ) {}
 
     /**
-     * @return array{results: array<int, array<string, mixed>>, trending_hashtags: array<int, array{tag: string, count: int}>}
+     * @return array{results: array<int, array<string, mixed>>, users: array<int, array<string, mixed>>, trending_hashtags: array<int, array{tag: string, count: int}>}
      */
     public function __invoke(SearchContentData $data): array
     {
@@ -31,8 +37,19 @@ class DiscoverContentAction
                 ? $this->postRepository->searchPublished($query, $data->limit)
                 : []);
 
+        $users = $query !== ''
+            ? array_values(array_filter(
+                array_map(
+                    fn ($user): ?array => $this->serializeUser($user, $data->user_id),
+                    $this->userRepository->searchDiscoverable($query, min($data->limit, 10)),
+                ),
+                static fn ($user): bool => $user !== null,
+            ))
+            : [];
+
         return [
             'results' => array_map(fn (Post $post): array => $this->serializePost($post), $posts),
+            'users' => $users,
             'trending_hashtags' => $this->postRepository->getTrendingHashtags(8),
         ];
     }
@@ -71,5 +88,17 @@ class DiscoverContentAction
                 ])->values()->all()
                 : [],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function serializeUser($user, ?string $viewerId): ?array
+    {
+        if ($viewerId !== null && $this->blockRepository->eitherBlocked($viewerId, $user->id)) {
+            return null;
+        }
+
+        return ($this->buildUserPayload)($user);
     }
 }

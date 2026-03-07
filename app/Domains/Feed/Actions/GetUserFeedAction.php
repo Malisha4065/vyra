@@ -24,6 +24,7 @@ class GetUserFeedAction
         private readonly PostRepositoryInterface $postRepository,
         private readonly BlockRepositoryInterface $blockRepository,
         private readonly MuteRepositoryInterface $muteRepository,
+        private readonly BuildFeedPersonalizationSignalsAction $buildPersonalizationSignals,
         private readonly CalculateFeedItemScoreAction $calculateFeedItemScore,
     ) {}
 
@@ -36,6 +37,7 @@ class GetUserFeedAction
             limit: $fetchLimit,
             beforeScore: $data->before_score,
         );
+        $personalizationSignals = ($this->buildPersonalizationSignals)($data->user_id);
 
         $followingIds = $this->followRepository->getFollowingIds($data->user_id);
         $highFollowerAuthors = $this->hybridFeedRepository->filterHighFollowerAuthors($followingIds);
@@ -92,7 +94,7 @@ class GetUserFeedAction
 
             $scoredItems[] = [
                 'post_id' => $item['post_id'],
-                'score' => ($this->calculateFeedItemScore)($post, $item['source_score'], $data->mode),
+                'score' => ($this->calculateFeedItemScore)($post, $item['source_score'], $data->mode, $personalizationSignals),
                 'source_score' => $item['source_score'],
                 'post' => $this->serializePost($post),
             ];

@@ -3,7 +3,11 @@
 use App\Domains\Content\Actions\DiscoverContentAction;
 use App\Domains\Content\Data\SearchContentData;
 use App\Domains\Content\Models\Post;
+use App\Domains\Identity\Actions\BuildUserSearchPayloadAction;
+use App\Domains\Identity\Models\User;
+use App\Domains\Identity\Repositories\UserRepositoryInterface;
 use App\Domains\Content\Repositories\PostRepositoryInterface;
+use App\Domains\SocialGraph\Repositories\BlockRepositoryInterface;
 
 it('searches published posts by query', function () {
     $post = new Post();
@@ -19,18 +23,31 @@ it('searches published posts by query', function () {
     $post->setRelation('reactions', collect());
     $post->setRelation('media', collect());
 
+    $user = new User();
+    $user->forceFill(['id' => 'user-2', 'username' => 'bob']);
+    $user->setRelation('profile', null);
+
     $repository = mock(PostRepositoryInterface::class);
     $repository->shouldReceive('searchPublished')->once()->with('laravel', 20)->andReturn([$post]);
     $repository->shouldReceive('getTrendingHashtags')->once()->with(8)->andReturn([['tag' => 'laravel', 'count' => 3]]);
     $repository->shouldReceive('findPublishedByHashtag')->never();
+    $repository->shouldReceive('getRecentPublishedByAuthor')->never();
 
-    $action = new DiscoverContentAction($repository);
+    $userRepository = mock(UserRepositoryInterface::class);
+    $userRepository->shouldReceive('searchDiscoverable')->once()->with('laravel', 10)->andReturn([$user]);
+
+    $blockRepository = mock(BlockRepositoryInterface::class);
+    $blockRepository->shouldReceive('eitherBlocked')->once()->with('viewer-1', 'user-2')->andReturn(false);
+
+    $action = new DiscoverContentAction($repository, $userRepository, $blockRepository, new BuildUserSearchPayloadAction());
 
     $result = $action(SearchContentData::from([
+        'user_id' => 'viewer-1',
         'query' => 'laravel',
     ]));
 
     expect($result['results'][0]['id'])->toBe('post-1');
+    expect($result['users'][0]['username'])->toBe('bob');
     expect($result['trending_hashtags'][0]['tag'])->toBe('laravel');
 });
 
@@ -39,10 +56,18 @@ it('treats hash-prefixed queries as hashtag discovery', function () {
     $repository->shouldReceive('findPublishedByHashtag')->once()->with('vyra', 20)->andReturn([]);
     $repository->shouldReceive('getTrendingHashtags')->once()->with(8)->andReturn([]);
     $repository->shouldReceive('searchPublished')->never();
+    $repository->shouldReceive('getRecentPublishedByAuthor')->never();
 
-    $action = new DiscoverContentAction($repository);
+    $userRepository = mock(UserRepositoryInterface::class);
+    $userRepository->shouldReceive('searchDiscoverable')->never();
+
+    $blockRepository = mock(BlockRepositoryInterface::class);
+    $blockRepository->shouldReceive('eitherBlocked')->never();
+
+    $action = new DiscoverContentAction($repository, $userRepository, $blockRepository, new BuildUserSearchPayloadAction());
 
     $action(SearchContentData::from([
+        'user_id' => 'viewer-1',
         'query' => '#Vyra',
     ]));
 

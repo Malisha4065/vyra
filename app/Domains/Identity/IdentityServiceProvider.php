@@ -2,8 +2,13 @@
 
 namespace App\Domains\Identity;
 
+use App\Domains\Identity\Events\AccountDeleted;
+use App\Domains\Identity\Events\ProfileUpdated;
 use App\Domains\Identity\Events\UserRegistered;
 use App\Domains\Identity\Listeners\CreateUserProfileListener;
+use App\Domains\Identity\Listeners\QueueRegisteredUserSearchIndexListener;
+use App\Domains\Identity\Listeners\QueueRemoveDeletedUserSearchIndexListener;
+use App\Domains\Identity\Listeners\QueueUserSearchIndexListener;
 use App\Domains\Identity\Models\UserProfile;
 use App\Domains\Identity\Policies\UserProfilePolicy;
 use App\Domains\Identity\Repositories\EloquentUserProfileRepository;
@@ -27,6 +32,9 @@ class IdentityServiceProvider extends ServiceProvider
     {
         // Event → Listener mappings
         Event::listen(UserRegistered::class, CreateUserProfileListener::class);
+        Event::listen(UserRegistered::class, QueueRegisteredUserSearchIndexListener::class);
+        Event::listen(ProfileUpdated::class, QueueUserSearchIndexListener::class);
+        Event::listen(AccountDeleted::class, QueueRemoveDeletedUserSearchIndexListener::class);
 
         // Policy registrations
         Gate::policy(UserProfile::class, UserProfilePolicy::class);
