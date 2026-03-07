@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import UserAutocomplete from '@/Components/UserAutocomplete.vue';
 
 const props = defineProps({
     feed: {
@@ -26,6 +27,8 @@ const loadingMore = ref(false);
 const uploading = ref(false);
 const uploadedMedia = ref([]);
 const rebuilding = ref(false);
+const mentionSearch = ref('');
+const composerRef = ref(null);
 
 const form = useForm({
     body: '',
@@ -79,6 +82,32 @@ function relativeTime(isoString) {
 
 function removeDraftMedia(path) {
     uploadedMedia.value = uploadedMedia.value.filter((media) => media.path !== path);
+}
+
+function insertMention(user) {
+    const mention = `@${user.username} `;
+    const textarea = composerRef.value;
+
+    if (!textarea) {
+        form.body = `${form.body}${form.body.endsWith(' ') || form.body === '' ? '' : ' '}${mention}`;
+        mentionSearch.value = '';
+        return;
+    }
+
+    const start = textarea.selectionStart ?? form.body.length;
+    const end = textarea.selectionEnd ?? form.body.length;
+    const prefix = form.body.slice(0, start);
+    const suffix = form.body.slice(end);
+    const separator = prefix.length > 0 && !/\s$/.test(prefix) ? ' ' : '';
+
+    form.body = `${prefix}${separator}${mention}${suffix}`;
+    mentionSearch.value = '';
+
+    nextTick(() => {
+        const cursor = (prefix + separator + mention).length;
+        textarea.focus();
+        textarea.setSelectionRange(cursor, cursor);
+    });
 }
 
 function switchMode(mode) {
@@ -239,11 +268,29 @@ watch(items, () => {
 
                     <div class="space-y-4 px-6 py-5">
                         <textarea
+                            ref="composerRef"
                             v-model="form.body"
                             rows="4"
                             class="w-full resize-none rounded-2xl border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-200 dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
                             placeholder="What are you building, thinking, or shipping?"
                         />
+
+                        <div class="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+                            <div class="mb-2 flex items-center justify-between gap-3">
+                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">
+                                    Mention someone
+                                </p>
+                                <span class="text-xs text-emerald-700/80 dark:text-emerald-300/80">
+                                    Inserts `@username` into the composer
+                                </span>
+                            </div>
+                            <UserAutocomplete
+                                v-model="mentionSearch"
+                                placeholder="Search users to mention"
+                                empty-label="No matching users to mention."
+                                @select="insertMention"
+                            />
+                        </div>
 
                         <div v-if="uploadedMedia.length > 0" class="grid gap-3 sm:grid-cols-2">
                             <div

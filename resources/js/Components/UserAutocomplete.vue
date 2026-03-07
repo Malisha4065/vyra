@@ -1,6 +1,9 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
+const CACHE_TTL_MS = 30_000;
+const queryCache = new Map();
+
 const props = defineProps({
     modelValue: {
         type: String,
@@ -65,6 +68,16 @@ watch(() => props.modelValue, (value) => {
 
 async function fetchResults(query) {
     const activeRequestId = ++requestId;
+    const cacheKey = `${props.limit}:${query.toLowerCase()}`;
+    const cachedEntry = queryCache.get(cacheKey);
+
+    if (cachedEntry && (Date.now() - cachedEntry.createdAt) < CACHE_TTL_MS) {
+        results.value = cachedEntry.results;
+        loading.value = false;
+        error.value = null;
+        isOpen.value = true;
+        return;
+    }
 
     loading.value = true;
     error.value = null;
@@ -80,6 +93,10 @@ async function fetchResults(query) {
         }
 
         results.value = response.data?.data ?? [];
+        queryCache.set(cacheKey, {
+            createdAt: Date.now(),
+            results: results.value,
+        });
         isOpen.value = true;
     } catch {
         if (activeRequestId !== requestId) {
