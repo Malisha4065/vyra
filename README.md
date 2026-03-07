@@ -93,6 +93,20 @@ php artisan ops:queue-health
 php artisan scout:sync-index-settings
 ```
 
+### Docker Compose
+
+If you want the full MVP stack locally with PostgreSQL, Redis, MinIO, Meilisearch, Reverb, Horizon, and Mailpit:
+
+```bash
+cp .env.docker.example .env.docker
+docker compose up -d --build
+docker compose run --rm app php artisan key:generate --show
+docker compose run --rm app php artisan migrate --force
+docker compose run --rm app php artisan scout:sync-index-settings
+```
+
+See [docs/docker-compose.md](docs/docker-compose.md) for the full workflow and service URLs.
+
 ## Production Notes
 
 - Product routes now require authenticated and verified users.
