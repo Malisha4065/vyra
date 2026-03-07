@@ -4,6 +4,13 @@ import { usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { ensureEcho } from '@/lib/echo';
 
+const props = defineProps({
+    targetUserId: {
+        type: String,
+        default: null,
+    },
+});
+
 const page = usePage();
 
 const authUserId = computed(() => page.props.auth?.user?.id ?? null);
@@ -16,8 +23,10 @@ const composer = ref('');
 const loadingConversations = ref(false);
 const loadingMessages = ref(false);
 const sendingMessage = ref(false);
+const startingConversation = ref(false);
 
 const remoteTypingUserIds = ref([]);
+const directConversationError = ref(null);
 
 const messageListRef = ref(null);
 
@@ -30,6 +39,42 @@ let localTyping = false;
 const activeConversation = computed(() =>
     conversations.value.find((conversation) => conversation.id === activeConversationId.value) ?? null,
 );
+
+function normalizeReadReceipt(receipt) {
+    return {
+        user_id: receipt?.user_id ?? null,
+        read_at: receipt?.read_at ?? null,
+    };
+}
+
+function normalizeParticipant(participant) {
+    return {
+        id: participant.id,
+        username: participant.username,
+        read_state: {
+            last_read_message_id: participant.read_state?.last_read_message_id ?? null,
+            last_read_at: participant.read_state?.last_read_at ?? null,
+        },
+    };
+}
+
+function normalizeConversation(conversation) {
+    return {
+        id: conversation.id,
+        type: conversation.type,
+        updated_at: conversation.updated_at,
+        participants: (conversation.participants ?? []).map(normalizeParticipant),
+        latest_message: conversation.latest_message
+            ? {
+                id: conversation.latest_message.id,
+                body: conversation.latest_message.body,
+                sender_id: conversation.latest_message.sender_id,
+                created_at: conversation.latest_message.created_at,
+                sender: conversation.latest_message.sender ?? null,
+            }
+            : null,
+    };
+}
 
 const typingLabel = computed(() => {
     if (!activeConversation.value || remoteTypingUserIds.value.length === 0) {
@@ -48,15 +93,31 @@ const typingLabel = computed(() => {
     return `${names.join(', ')} ${names.length > 1 ? 'are' : 'is'} typing...`;
 });
 
+function findParticipant(conversation, userId) {
+    return (conversation?.participants ?? []).find((participant) => participant.id === userId) ?? null;
+}
+
 function conversationTitle(conversation) {
-    const participants = conversation?.participants ?? [];
-    const otherParticipant = participants.find((participant) => participant.id !== authUserId.value);
+    const otherParticipant = (conversation?.participants ?? [])
+        .find((participant) => participant.id !== authUserId.value);
 
     return otherParticipant?.username ?? 'Direct conversation';
 }
 
 function latestPreview(conversation) {
     return conversation?.latest_message?.body ?? 'No messages yet';
+}
+
+function conversationHasUnread(conversation) {
+    const latestMessage = conversation?.latest_message;
+
+    if (!latestMessage || latestMessage.sender_id === authUserId.value) {
+        return false;
+    }
+
+    const authParticipant = findParticipant(conversation, authUserId.value);
+
+    return authParticipant?.read_state?.last_read_message_id !== latestMessage.id;
 }
 
 function isOwnMessage(message) {
@@ -75,7 +136,26 @@ function normalizeMessage(message) {
             id: message.sender?.id,
             username: message.sender?.username,
         },
+        read_receipts: (message.read_receipts ?? []).map(normalizeReadReceipt),
     };
+}
+
+function messageReadLabel(message) {
+    if (!isOwnMessage(message)) {
+        return null;
+    }
+
+    const otherReceipts = (message.read_receipts ?? []).filter((receipt) => receipt.user_id !== authUserId.value);
+
+    if (otherReceipts.length === 0) {
+        return null;
+    }
+
+    if (otherReceipts.length === 1) {
+        return 'Seen';
+    }
+
+    return `Seen by ${otherReceipts.length}`;
 }
 
 function clearTypingState() {
@@ -115,8 +195,14 @@ function touchConversation(conversationId, message) {
 
 function upsertMessage(message) {
     const normalized = normalizeMessage(message);
+    const index = messages.value.findIndex((current) => current.id === normalized.id);
 
-    if (messages.value.some((current) => current.id === normalized.id)) {
+    if (index !== -1) {
+        messages.value[index] = {
+            ...messages.value[index],
+            ...normalized,
+        };
+
         return;
     }
 
@@ -130,6 +216,60 @@ function upsertMessage(message) {
     });
 
     scrollMessagesToBottom();
+}
+
+function updateConversationReadState(conversationId, readerId, messageIds, readAt) {
+    const conversationIndex = conversations.value.findIndex((conversation) => conversation.id === conversationId);
+
+    if (conversationIndex === -1 || messageIds.length === 0) {
+        return;
+    }
+
+    const conversation = conversations.value[conversationIndex];
+
+    conversations.value[conversationIndex] = {
+        ...conversation,
+        participants: (conversation.participants ?? []).map((participant) => {
+            if (participant.id !== readerId) {
+                return participant;
+            }
+
+            return {
+                ...participant,
+                read_state: {
+                    last_read_message_id: messageIds[messageIds.length - 1],
+                    last_read_at: readAt,
+                },
+            };
+        }),
+    };
+}
+
+function applyReadReceipts(payload) {
+    updateConversationReadState(payload.conversation_id, payload.reader_id, payload.message_ids ?? [], payload.read_at);
+
+    messages.value = messages.value.map((message) => {
+        if (!payload.message_ids?.includes(message.id)) {
+            return message;
+        }
+
+        const alreadyRead = message.read_receipts.some((receipt) => receipt.user_id === payload.reader_id);
+
+        if (alreadyRead) {
+            return message;
+        }
+
+        return {
+            ...message,
+            read_receipts: [
+                ...message.read_receipts,
+                {
+                    user_id: payload.reader_id,
+                    read_at: payload.read_at,
+                },
+            ],
+        };
+    });
 }
 
 function scrollMessagesToBottom() {
@@ -206,6 +346,14 @@ async function subscribeToConversation(conversationId) {
         })
         .listen('.communication.typing.updated', (payload) => {
             handleTypingEvent(payload);
+        })
+        .listen('.communication.read.updated', (payload) => {
+            handleTypingEvent({
+                ...payload,
+                is_typing: false,
+                user_id: payload.reader_id,
+            });
+            applyReadReceipts(payload);
         });
 }
 
@@ -214,7 +362,7 @@ async function loadConversations(selectFirst = true) {
 
     try {
         const response = await window.axios.get(route('messages.conversations.index'));
-        conversations.value = response.data.data ?? [];
+        conversations.value = (response.data.data ?? []).map(normalizeConversation);
 
         if (selectFirst && !activeConversationId.value && conversations.value.length > 0) {
             activeConversationId.value = conversations.value[0].id;
@@ -249,9 +397,28 @@ async function markConversationRead() {
         return;
     }
 
-    await window.axios.put(route('messages.conversations.read', {
+    const response = await window.axios.put(route('messages.conversations.read', {
         conversation: activeConversationId.value,
     }));
+
+    if ((response.data?.data?.marked_count ?? 0) === 0 || !activeConversation.value) {
+        return;
+    }
+
+    const readMessageIds = messages.value
+        .filter((message) => !isOwnMessage(message))
+        .map((message) => message.id);
+
+    if (readMessageIds.length === 0) {
+        return;
+    }
+
+    updateConversationReadState(
+        activeConversationId.value,
+        authUserId.value,
+        readMessageIds,
+        new Date().toISOString(),
+    );
 }
 
 async function emitTyping(isTyping) {
@@ -302,6 +469,29 @@ async function sendMessage() {
     }
 }
 
+async function startDirectConversation(targetUserId) {
+    if (!targetUserId || targetUserId === authUserId.value || startingConversation.value) {
+        return;
+    }
+
+    startingConversation.value = true;
+    directConversationError.value = null;
+
+    try {
+        const response = await window.axios.post(route('messages.conversations.direct.start'), {
+            target_user_id: targetUserId,
+        });
+
+        await loadConversations(false);
+
+        activeConversationId.value = response.data?.data?.conversation_id ?? activeConversationId.value;
+    } catch (error) {
+        directConversationError.value = error?.response?.data?.message ?? 'Unable to start this conversation.';
+    } finally {
+        startingConversation.value = false;
+    }
+}
+
 function handleComposerInput() {
     if (!activeConversationId.value) {
         return;
@@ -338,6 +528,7 @@ watch(activeConversationId, async (conversationId) => {
 
 onMounted(async () => {
     await loadConversations(true);
+    await startDirectConversation(props.targetUserId);
 });
 
 onBeforeUnmount(async () => {
@@ -365,9 +556,21 @@ onBeforeUnmount(async () => {
     <AppLayout title="Messages">
         <div class="grid gap-4 lg:grid-cols-[320px_1fr]">
             <section class="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-                <h1 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-                    Conversations
-                </h1>
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <h1 class="text-lg font-semibold text-gray-900 dark:text-white">
+                        Conversations
+                    </h1>
+                    <span
+                        v-if="startingConversation"
+                        class="text-xs font-medium text-primary-600 dark:text-primary-400"
+                    >
+                        Starting...
+                    </span>
+                </div>
+
+                <p v-if="directConversationError" class="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/70 dark:bg-red-950/60 dark:text-red-300">
+                    {{ directConversationError }}
+                </p>
 
                 <div v-if="loadingConversations" class="text-sm text-gray-500 dark:text-gray-400">
                     Loading conversations...
@@ -392,9 +595,15 @@ onBeforeUnmount(async () => {
                             <p class="truncate text-sm font-semibold text-gray-900 dark:text-white">
                                 {{ conversationTitle(conversation) }}
                             </p>
-                            <span class="text-xs text-gray-400">
-                                {{ conversation.latest_message?.created_at?.slice(11, 16) ?? '' }}
-                            </span>
+                            <div class="flex items-center gap-2">
+                                <span
+                                    v-if="conversationHasUnread(conversation)"
+                                    class="h-2.5 w-2.5 rounded-full bg-primary-500"
+                                />
+                                <span class="text-xs text-gray-400">
+                                    {{ conversation.latest_message?.created_at?.slice(11, 16) ?? '' }}
+                                </span>
+                            </div>
                         </div>
                         <p class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
                             {{ latestPreview(conversation) }}
@@ -443,6 +652,12 @@ onBeforeUnmount(async () => {
                                     {{ message.sender?.username ?? 'Unknown' }}
                                 </p>
                                 <p class="whitespace-pre-wrap break-words">{{ message.body }}</p>
+                                <p
+                                    v-if="messageReadLabel(message)"
+                                    class="mt-2 text-[11px] font-medium opacity-80"
+                                >
+                                    {{ messageReadLabel(message) }}
+                                </p>
                             </div>
                         </div>
                     </div>

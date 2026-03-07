@@ -1,10 +1,16 @@
 <script setup>
+import { computed } from 'vue';
+import { Link, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 
-defineProps({
+const props = defineProps({
     user: Object,
     profile: Object,
 });
+
+const page = usePage();
+
+const isOwnProfile = computed(() => page.props.auth?.user?.id === props.user?.id);
 </script>
 
 <template>
@@ -43,6 +49,15 @@ defineProps({
                         </h1>
                         <p class="text-sm text-gray-500 dark:text-gray-400">@{{ user.username }}</p>
                     </div>
+                </div>
+
+                <div v-if="!isOwnProfile" class="mt-4">
+                    <Link
+                        :href="route('messages.index', { target_user_id: user.id })"
+                        class="inline-flex items-center rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-900 transition hover:border-gray-400 hover:bg-gray-50 dark:border-gray-700 dark:text-white dark:hover:border-gray-600 dark:hover:bg-gray-800"
+                    >
+                        Message
+                    </Link>
                 </div>
 
                 <!-- Bio -->

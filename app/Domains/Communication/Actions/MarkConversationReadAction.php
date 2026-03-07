@@ -34,15 +34,13 @@ class MarkConversationReadAction
             readAt: $readAt,
         );
 
-        $lastReadMessageId = $unreadMessageIds === [] ? null : end($unreadMessageIds);
-
-        $this->conversationRepository->touchParticipantReadState(
-            conversationId: $conversation->id,
-            userId: $reader->id,
-            lastReadMessageId: $lastReadMessageId,
-        );
-
         if ($unreadMessageIds !== []) {
+            $this->conversationRepository->touchParticipantReadState(
+                conversationId: $conversation->id,
+                userId: $reader->id,
+                lastReadMessageId: end($unreadMessageIds),
+            );
+
             event(new ConversationMessagesRead(
                 conversationId: $conversation->id,
                 readerId: $reader->id,

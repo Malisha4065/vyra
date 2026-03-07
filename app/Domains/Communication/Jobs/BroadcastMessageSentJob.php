@@ -36,6 +36,7 @@ class BroadcastMessageSentJob implements ShouldQueue
                     'id' => $message->sender?->id,
                     'username' => $message->sender?->username,
                 ],
+                'read_receipts' => [],
             ],
         ));
     }

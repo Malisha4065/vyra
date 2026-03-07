@@ -146,10 +146,20 @@ class ConversationController extends Controller
             'id' => $conversation->id,
             'type' => $conversation->type,
             'updated_at' => $conversation->updated_at?->toIso8601String(),
-            'participants' => $conversation->participants->map(static fn ($participant): array => [
-                'id' => $participant->id,
-                'username' => $participant->username,
-            ])->values()->all(),
+            'participants' => $conversation->participants->map(static function ($participant): array {
+                $lastReadAt = $participant->pivot?->last_read_at;
+
+                return [
+                    'id' => $participant->id,
+                    'username' => $participant->username,
+                    'read_state' => [
+                        'last_read_message_id' => $participant->pivot?->last_read_message_id,
+                        'last_read_at' => $lastReadAt instanceof \DateTimeInterface
+                            ? $lastReadAt->format(DATE_ATOM)
+                            : $lastReadAt,
+                    ],
+                ];
+            })->values()->all(),
             'latest_message' => $latestMessage ? [
                 'id' => $latestMessage->id,
                 'body' => $latestMessage->body,

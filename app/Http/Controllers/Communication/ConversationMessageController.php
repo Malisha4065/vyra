@@ -100,6 +100,13 @@ class ConversationMessageController extends Controller
                 'id' => $message->sender?->id,
                 'username' => $message->sender?->username,
             ],
+            'read_receipts' => $message->readReceipts
+                ->map(static fn ($receipt): array => [
+                    'user_id' => $receipt->user_id,
+                    'read_at' => $receipt->read_at?->toIso8601String(),
+                ])
+                ->values()
+                ->all(),
         ];
     }
 }

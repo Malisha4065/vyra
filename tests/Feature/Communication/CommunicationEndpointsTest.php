@@ -2,12 +2,15 @@
 
 use App\Domains\Communication\Models\Conversation;
 use App\Domains\Communication\Models\Message;
+use App\Domains\Communication\Models\MessageReadReceipt;
+use App\Domains\Communication\Actions\ListUserConversationsAction;
 use App\Domains\Communication\Repositories\ConversationRepositoryInterface;
 use App\Domains\Communication\Repositories\MessageReadReceiptRepositoryInterface;
 use App\Domains\Communication\Repositories\MessageRepositoryInterface;
 use App\Domains\Identity\Models\User;
 use App\Domains\Identity\Repositories\UserRepositoryInterface;
 use App\Domains\SocialGraph\Repositories\BlockRepositoryInterface;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Event;
 
@@ -68,6 +71,72 @@ it('starts a direct conversation via endpoint', function () {
     $response->assertJsonPath('data.conversation_id', 'conversation-1');
 });
 
+it('lists conversations with participant read state via endpoint', function () {
+    $authUser = new User();
+    $authUser->forceFill([
+        'id' => 'user-1',
+        'username' => 'alice',
+        'email' => 'alice@example.com',
+        'password' => 'secret',
+    ]);
+
+    $otherUser = new User();
+    $otherUser->forceFill([
+        'id' => 'user-2',
+        'username' => 'bob',
+        'email' => 'bob@example.com',
+        'password' => 'secret',
+    ]);
+
+    $conversation = new Conversation();
+    $conversation->forceFill([
+        'id' => 'conversation-1',
+        'type' => 'direct',
+        'updated_at' => now(),
+    ]);
+
+    $authUser->setRelation('pivot', Pivot::fromAttributes($conversation, [
+        'last_read_message_id' => 'message-1',
+        'last_read_at' => now()->subMinute()->toDateTimeString(),
+    ], 'conversation_participants'));
+    $otherUser->setRelation('pivot', Pivot::fromAttributes($conversation, [
+        'last_read_message_id' => null,
+        'last_read_at' => null,
+    ], 'conversation_participants'));
+
+    $latestMessage = new Message();
+    $latestMessage->forceFill([
+        'id' => 'message-2',
+        'conversation_id' => 'conversation-1',
+        'sender_id' => 'user-2',
+        'body' => 'hello',
+        'created_at' => now(),
+    ]);
+    $latestMessage->setRelation('sender', $otherUser);
+
+    $conversation->setRelation('participants', collect([$authUser, $otherUser]));
+    $conversation->setRelation('latestMessage', $latestMessage);
+
+    $action = mock(ListUserConversationsAction::class);
+    $action->shouldReceive('__invoke')
+        ->once()
+        ->andReturn(new LengthAwarePaginator(
+            items: [$conversation],
+            total: 1,
+            perPage: 20,
+            currentPage: 1,
+        ));
+
+    $this->app->instance(ListUserConversationsAction::class, $action);
+
+    $response = $this->actingAs($authUser)
+        ->get(route('messages.conversations.index'));
+
+    $response->assertOk();
+    $response->assertJsonPath('data.0.participants.0.read_state.last_read_message_id', 'message-1');
+    $response->assertJsonPath('data.0.latest_message.id', 'message-2');
+});
+
 it('lists conversation messages for participant via endpoint', function () {
     $authUser = new User();
     $authUser->forceFill([
@@ -104,6 +173,70 @@ it('lists conversation messages for participant via endpoint', function () {
     $response->assertOk();
     $response->assertJsonPath('meta.total', 1);
     $response->assertJsonPath('data.0.id', 'message-1');
+});
+
+it('serializes read receipts when listing conversation messages', function () {
+    $authUser = new User();
+    $authUser->forceFill([
+        'id' => 'user-1',
+        'username' => 'alice',
+        'email' => 'alice@example.com',
+        'password' => 'secret',
+    ]);
+
+    $otherUser = new User();
+    $otherUser->forceFill([
+        'id' => 'user-2',
+        'username' => 'bob',
+        'email' => 'bob@example.com',
+        'password' => 'secret',
+    ]);
+
+    $conversation = new Conversation();
+    $conversation->forceFill(['id' => 'conversation-1']);
+
+    $conversationRepository = mock(ConversationRepositoryInterface::class);
+    $conversationRepository->shouldReceive('findById')->once()->with('conversation-1')->andReturn($conversation);
+    $conversationRepository->shouldReceive('isParticipant')->once()->with('conversation-1', 'user-1')->andReturn(true);
+
+    $receipt = new MessageReadReceipt();
+    $receipt->forceFill([
+        'id' => 'receipt-1',
+        'message_id' => 'message-1',
+        'user_id' => 'user-2',
+        'read_at' => now(),
+    ]);
+
+    $message = new Message();
+    $message->forceFill([
+        'id' => 'message-1',
+        'conversation_id' => 'conversation-1',
+        'sender_id' => 'user-1',
+        'body' => 'hello',
+        'created_at' => now(),
+    ]);
+    $message->setRelation('sender', $authUser);
+    $message->setRelation('readReceipts', collect([$receipt]));
+
+    $messageRepository = mock(MessageRepositoryInterface::class);
+    $messageRepository->shouldReceive('paginateForConversation')
+        ->once()
+        ->with('conversation-1', 30)
+        ->andReturn(new LengthAwarePaginator(
+            items: [$message],
+            total: 1,
+            perPage: 30,
+            currentPage: 1,
+        ));
+
+    $this->app->instance(ConversationRepositoryInterface::class, $conversationRepository);
+    $this->app->instance(MessageRepositoryInterface::class, $messageRepository);
+
+    $response = $this->actingAs($authUser)
+        ->get(route('messages.conversations.messages.index', ['conversation' => 'conversation-1']));
+
+    $response->assertOk();
+    $response->assertJsonPath('data.0.read_receipts.0.user_id', 'user-2');
 });
 
 it('marks conversation messages as read via endpoint', function () {
