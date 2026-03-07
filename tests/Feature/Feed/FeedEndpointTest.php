@@ -1,5 +1,6 @@
 <?php
 
+use App\Domains\Feed\Actions\RequestUserFeedRebuildAction;
 use App\Domains\Feed\Actions\GetUserFeedAction;
 use App\Domains\Feed\Data\FeedAuthorData;
 use App\Domains\Feed\Data\FeedItemData;
@@ -23,7 +24,7 @@ it('renders feed page with hydrated feed payload', function () {
     $action->shouldReceive('__invoke')
         ->once()
         ->withArgs(function (GetUserFeedData $data) {
-            return $data->user_id === 'user-1' && $data->limit === 50;
+            return $data->user_id === 'user-1' && $data->limit === 50 && $data->mode === 'top';
         })
         ->andReturn(new UserFeedResponseData(
             items: [
@@ -63,6 +64,7 @@ it('renders feed page with hydrated feed payload', function () {
     $response->assertInertia(fn (Assert $page) => $page
         ->component('Feed/Index')
         ->where('focusPostId', null)
+        ->where('mode', 'top')
         ->where('feed.next_cursor', 1000)
         ->where('feed.items.0.post_id', 'post-1')
         ->where('feed.items.0.post.body', 'Hydrated post'));
@@ -97,6 +99,7 @@ it('passes focus post id to feed page when requested', function () {
     $response->assertOk();
     $response->assertInertia(fn (Assert $page) => $page
         ->component('Feed/Index')
+        ->where('mode', 'top')
         ->where('focusPostId', 'post-99')
     );
 });
@@ -114,7 +117,7 @@ it('returns feed json for cursor pagination requests', function () {
     $action->shouldReceive('__invoke')
         ->once()
         ->withArgs(function (GetUserFeedData $data) {
-            return $data->user_id === 'user-1' && $data->before_score === 900;
+            return $data->user_id === 'user-1' && $data->before_score === 900 && $data->mode === 'top';
         })
         ->andReturn(new UserFeedResponseData(
             items: [
@@ -153,6 +156,35 @@ it('returns feed json for cursor pagination requests', function () {
         ->get(route('feed', ['before_score' => 900]));
 
     $response->assertOk();
+    $response->assertJsonPath('meta.mode', 'top');
     $response->assertJsonPath('meta.next_cursor', 800);
     $response->assertJsonPath('data.0.post.id', 'post-2');
+});
+
+it('queues a feed rebuild request via endpoint', function () {
+    $user = new User();
+    $user->forceFill([
+        'id' => 'user-1',
+        'username' => 'reader',
+        'email' => 'reader@example.com',
+        'password' => 'secret',
+    ]);
+
+    $action = mock(RequestUserFeedRebuildAction::class);
+    $action->shouldReceive('__invoke')
+        ->once()
+        ->withArgs(fn ($data): bool => $data->user_id === 'user-1');
+
+    $this->app->instance(RequestUserFeedRebuildAction::class, $action);
+
+    $notificationRepository = mock(UserNotificationRepositoryInterface::class);
+    $notificationRepository->shouldReceive('unreadCount')->never();
+    $this->app->instance(UserNotificationRepositoryInterface::class, $notificationRepository);
+
+    $response = $this->actingAs($user)
+        ->withHeaders(['Accept' => 'application/json'])
+        ->post(route('feed.rebuild'));
+
+    $response->assertStatus(202);
+    $response->assertJsonPath('data.queued', true);
 });

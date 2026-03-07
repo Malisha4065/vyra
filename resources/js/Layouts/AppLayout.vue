@@ -69,6 +69,9 @@ onBeforeUnmount(() => {
                 </a>
 
                 <div class="flex items-center gap-4">
+                    <a :href="route('content.discover')" class="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors">
+                        Discover
+                    </a>
                     <a :href="route('notifications.page')" class="relative text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors">
                         Alerts
                         <span

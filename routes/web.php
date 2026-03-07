@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Content\CommentController;
+use App\Http\Controllers\Content\DiscoverController;
 use App\Http\Controllers\Communication\ConversationController;
 use App\Http\Controllers\Communication\ConversationMessageController;
 use App\Http\Controllers\Communication\MessagePageController;
@@ -43,11 +44,15 @@ Route::middleware('auth')->group(function () {
 
     // Feed
     Route::get('/', [FeedController::class, 'index'])->name('feed');
+    Route::post('/feed/rebuild', [FeedController::class, 'rebuild'])->name('feed.rebuild');
+    Route::get('/discover', [DiscoverController::class, 'index'])->name('content.discover');
 
     // Profile
     Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/privacy', [ProfileController::class, 'updatePrivacy'])->name('profile.privacy');
+    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+    Route::delete('/profile/account', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::get('/@{username}', [ProfileController::class, 'show'])->name('profile.show');
 
     // ─── SocialGraph ─────────────────────────────────────────────────

@@ -27,6 +27,27 @@ interface PostRepositoryInterface
      */
     public function findByIds(array $ids): array;
 
+    /**
+     * @param array<int, string> $authorIds
+     * @return array<int, array{post_id: string, score: int}>
+     */
+    public function getRecentPublishedPostIdsByAuthors(array $authorIds, int $limit = 500): array;
+
+    /**
+     * @return array<int, Post>
+     */
+    public function searchPublished(string $query, int $limit = 20): array;
+
+    /**
+     * @return array<int, Post>
+     */
+    public function findPublishedByHashtag(string $hashtag, int $limit = 20): array;
+
+    /**
+     * @return array<int, array{tag: string, count: int}>
+     */
+    public function getTrendingHashtags(int $limit = 10): array;
+
     public function updateBody(Post $post, string $body): Post;
 
     public function markMediaProcessed(string $postId): int;

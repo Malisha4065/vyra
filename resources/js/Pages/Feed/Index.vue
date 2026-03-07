@@ -12,6 +12,10 @@ const props = defineProps({
         type: String,
         default: null,
     },
+    mode: {
+        type: String,
+        default: 'top',
+    },
 });
 
 const page = usePage();
@@ -21,6 +25,7 @@ const nextCursor = ref(props.feed.next_cursor ?? null);
 const loadingMore = ref(false);
 const uploading = ref(false);
 const uploadedMedia = ref([]);
+const rebuilding = ref(false);
 
 const form = useForm({
     body: '',
@@ -76,6 +81,12 @@ function removeDraftMedia(path) {
     uploadedMedia.value = uploadedMedia.value.filter((media) => media.path !== path);
 }
 
+function switchMode(mode) {
+    window.location.href = route('feed', {
+        mode,
+    });
+}
+
 async function uploadFiles(event) {
     const files = Array.from(event.target.files ?? []);
 
@@ -128,6 +139,7 @@ async function loadMore() {
     try {
         const response = await window.axios.get(route('feed', {
             before_score: nextCursor.value,
+            mode: props.mode,
         }), {
             headers: {
                 Accept: 'application/json',
@@ -143,6 +155,24 @@ async function loadMore() {
         nextCursor.value = response.data.meta?.next_cursor ?? null;
     } finally {
         loadingMore.value = false;
+    }
+}
+
+async function rebuildFeed() {
+    if (rebuilding.value) {
+        return;
+    }
+
+    rebuilding.value = true;
+
+    try {
+        await window.axios.post(route('feed.rebuild'), {}, {
+            headers: {
+                Accept: 'application/json',
+            },
+        });
+    } finally {
+        rebuilding.value = false;
     }
 }
 
@@ -164,12 +194,47 @@ watch(items, () => {
                     @submit.prevent="submitPost"
                 >
                     <div class="border-b border-gray-200 bg-[radial-gradient(circle_at_top_left,_rgba(34,197,94,0.12),_transparent_34%),linear-gradient(135deg,_rgba(255,255,255,0.96),_rgba(240,253,244,0.96))] px-6 py-5 dark:border-gray-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(34,197,94,0.08),_transparent_34%),linear-gradient(135deg,_rgba(17,24,39,0.96),_rgba(24,24,27,0.96))]">
-                        <p class="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-600 dark:text-emerald-400">
-                            Publish
-                        </p>
-                        <h1 class="mt-2 text-2xl font-semibold tracking-tight text-gray-950 dark:text-white">
-                            Share what matters now
-                        </h1>
+                        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-600 dark:text-emerald-400">
+                                    Publish
+                                </p>
+                                <h1 class="mt-2 text-2xl font-semibold tracking-tight text-gray-950 dark:text-white">
+                                    Share what matters now
+                                </h1>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-2">
+                                <button
+                                    type="button"
+                                    class="rounded-full px-4 py-2 text-sm font-semibold transition"
+                                    :class="mode === 'top'
+                                        ? 'bg-gray-950 text-white dark:bg-white dark:text-gray-950'
+                                        : 'border border-gray-300 text-gray-700 dark:border-gray-700 dark:text-gray-300'"
+                                    @click="switchMode('top')"
+                                >
+                                    Top
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded-full px-4 py-2 text-sm font-semibold transition"
+                                    :class="mode === 'latest'
+                                        ? 'bg-gray-950 text-white dark:bg-white dark:text-gray-950'
+                                        : 'border border-gray-300 text-gray-700 dark:border-gray-700 dark:text-gray-300'"
+                                    @click="switchMode('latest')"
+                                >
+                                    Latest
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded-full border border-emerald-300 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:border-emerald-400 dark:border-emerald-700 dark:text-emerald-300"
+                                    :disabled="rebuilding"
+                                    @click="rebuildFeed"
+                                >
+                                    {{ rebuilding ? 'Queueing...' : 'Rebuild feed' }}
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="space-y-4 px-6 py-5">
@@ -320,10 +385,13 @@ watch(items, () => {
                         Feed Engine
                     </p>
                     <h2 class="mt-2 text-xl font-semibold text-gray-950 dark:text-white">
-                        Fan-out on write is active
+                        {{ mode === 'top' ? 'Algorithmic ranking is active' : 'Chronological ranking is active' }}
                     </h2>
                     <p class="mt-3 text-sm leading-6 text-gray-600 dark:text-gray-400">
                         Posts from regular accounts are cached into follower timelines, while high-follower accounts are merged in with the hybrid strategy.
+                        {{ mode === 'top'
+                            ? ' Ranking now boosts engaged posts with comments, reactions, and media.'
+                            : ' The latest mode reads directly against the fan-out timeline order.' }}
                     </p>
                 </section>
 

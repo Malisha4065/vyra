@@ -29,4 +29,6 @@ interface FeedCacheRepositoryInterface
      * @param array<int, string> $userIds
      */
     public function removePostFromUserFeeds(array $userIds, string $postId): void;
+
+    public function clearUserFeed(string $userId): void;
 }

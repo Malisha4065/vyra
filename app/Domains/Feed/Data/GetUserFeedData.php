@@ -11,6 +11,7 @@ class GetUserFeedData extends Data
         public readonly int $limit = 50,
         public readonly ?int $before_score = null,
         public readonly int $hybrid_per_author = 5,
+        public readonly string $mode = 'top',
     ) {}
 
     /**
@@ -23,6 +24,7 @@ class GetUserFeedData extends Data
             'limit' => ['nullable', 'integer', 'min:1', 'max:200'],
             'before_score' => ['nullable', 'integer', 'min:1'],
             'hybrid_per_author' => ['nullable', 'integer', 'min:1', 'max:20'],
+            'mode' => ['nullable', 'string', 'in:top,latest'],
         ];
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Domains\Feed\Actions\CalculateFeedItemScoreAction;
 use App\Domains\Feed\Actions\GetUserFeedAction;
 use App\Domains\Feed\Data\GetUserFeedData;
 use App\Domains\Feed\Repositories\FeedCacheRepositoryInterface;
@@ -75,6 +76,7 @@ it('merges cached and hybrid feed entries ordered by score', function () {
         $postRepository,
         $blockRepository,
         $muteRepository,
+        new CalculateFeedItemScoreAction(),
     );
 
     $result = $action(GetUserFeedData::from([
@@ -137,6 +139,7 @@ it('uses ranked cursor when stale ids reduce hydrated result size', function () 
         $postRepository,
         $blockRepository,
         $muteRepository,
+        new CalculateFeedItemScoreAction(),
     );
 
     $result = $action(GetUserFeedData::from([
@@ -202,6 +205,7 @@ it('filters out muted and blocked authors from hydrated feed items', function ()
         $postRepository,
         $blockRepository,
         $muteRepository,
+        new CalculateFeedItemScoreAction(),
     );
 
     $result = $action(GetUserFeedData::from([
@@ -212,4 +216,63 @@ it('filters out muted and blocked authors from hydrated feed items', function ()
     expect($result->items)->toHaveCount(1);
     expect($result->items[0]->post_id)->toBe('post-c');
     expect($result->next_cursor)->toBe(700);
+});
+
+it('boosts highly engaged posts in top mode', function () {
+    $feedCacheRepository = mock(FeedCacheRepositoryInterface::class);
+    $feedCacheRepository->shouldReceive('getUserFeed')
+        ->once()
+        ->with('user-1', 6, null)
+        ->andReturn([
+            ['post_id' => 'post-new', 'score' => 1000],
+            ['post_id' => 'post-old', 'score' => 900],
+        ]);
+
+    $followRepository = mock(FollowRepositoryInterface::class);
+    $followRepository->shouldReceive('getFollowingIds')->once()->with('user-1')->andReturn([]);
+
+    $hybridFeedRepository = mock(HybridFeedRepositoryInterface::class);
+    $hybridFeedRepository->shouldReceive('filterHighFollowerAuthors')->once()->with([])->andReturn([]);
+    $hybridFeedRepository->shouldReceive('getRecentPostsForHighFollowerAuthors')->once()->with([], 10, null)->andReturn([]);
+
+    $postNew = new Post();
+    $postNew->forceFill(['id' => 'post-new', 'user_id' => 'author-1', 'body' => 'Fresh', 'published_at' => now()]);
+    $postNew->setRelation('comments', collect());
+    $postNew->setRelation('reactions', collect());
+    $postNew->setRelation('media', collect());
+
+    $postOld = new Post();
+    $postOld->forceFill(['id' => 'post-old', 'user_id' => 'author-2', 'body' => 'Engaged', 'published_at' => now()->subMinutes(10)]);
+    $postOld->setRelation('comments', collect([new \stdClass(), new \stdClass(), new \stdClass()]));
+    $postOld->setRelation('reactions', collect([new \stdClass(), new \stdClass(), new \stdClass(), new \stdClass(), new \stdClass()]));
+    $postOld->setRelation('media', collect());
+
+    $postRepository = mock(PostRepositoryInterface::class);
+    $postRepository->shouldReceive('findByIds')->once()->with(['post-new', 'post-old'])->andReturn([$postNew, $postOld]);
+
+    $blockRepository = mock(BlockRepositoryInterface::class);
+    $blockRepository->shouldReceive('eitherBlocked')->once()->with('user-1', 'author-1')->andReturn(false);
+    $blockRepository->shouldReceive('eitherBlocked')->once()->with('user-1', 'author-2')->andReturn(false);
+
+    $muteRepository = mock(MuteRepositoryInterface::class);
+    $muteRepository->shouldReceive('isMuting')->once()->with('user-1', 'author-1')->andReturn(false);
+    $muteRepository->shouldReceive('isMuting')->once()->with('user-1', 'author-2')->andReturn(false);
+
+    $action = new GetUserFeedAction(
+        $feedCacheRepository,
+        $hybridFeedRepository,
+        $followRepository,
+        $postRepository,
+        $blockRepository,
+        $muteRepository,
+        new CalculateFeedItemScoreAction(),
+    );
+
+    $result = $action(GetUserFeedData::from([
+        'user_id' => 'user-1',
+        'limit' => 2,
+        'mode' => 'top',
+    ]));
+
+    expect($result->items[0]->post_id)->toBe('post-old');
 });

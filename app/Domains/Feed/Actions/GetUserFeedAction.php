@@ -24,6 +24,7 @@ class GetUserFeedAction
         private readonly PostRepositoryInterface $postRepository,
         private readonly BlockRepositoryInterface $blockRepository,
         private readonly MuteRepositoryInterface $muteRepository,
+        private readonly CalculateFeedItemScoreAction $calculateFeedItemScore,
     ) {}
 
     public function __invoke(GetUserFeedData $data): UserFeedResponseData
@@ -61,24 +62,24 @@ class GetUserFeedAction
 
         arsort($merged);
 
-        $rankedItems = [];
+        $mergedEntries = [];
 
         foreach ($merged as $postId => $score) {
-            $rankedItems[] = [
+            $mergedEntries[] = [
                 'post_id' => (string) $postId,
-                'score' => (int) $score,
+                'source_score' => (int) $score,
             ];
 
-            if (count($rankedItems) >= $data->limit) {
+            if (count($mergedEntries) >= $fetchLimit) {
                 break;
             }
         }
 
-        $postsById = $this->hydratePosts($rankedItems);
-        $items = [];
+        $postsById = $this->hydratePosts($mergedEntries);
+        $scoredItems = [];
         $visibilityMap = [];
 
-        foreach ($rankedItems as $item) {
+        foreach ($mergedEntries as $item) {
             $post = $postsById[$item['post_id']] ?? null;
 
             if ($post === null) {
@@ -89,20 +90,31 @@ class GetUserFeedAction
                 continue;
             }
 
-            $items[] = [
+            $scoredItems[] = [
                 'post_id' => $item['post_id'],
-                'score' => $item['score'],
+                'score' => ($this->calculateFeedItemScore)($post, $item['source_score'], $data->mode),
+                'source_score' => $item['source_score'],
                 'post' => $this->serializePost($post),
             ];
         }
 
+        usort($scoredItems, static function (array $left, array $right): int {
+            if ($left['score'] === $right['score']) {
+                return $right['source_score'] <=> $left['source_score'];
+            }
+
+            return $right['score'] <=> $left['score'];
+        });
+
+        $items = array_slice($scoredItems, 0, $data->limit);
+
         $nextCursor = null;
 
         if (count($items) === $data->limit) {
-            $nextCursor = (int) end($items)['score'];
-        } elseif ($rankedItems !== []) {
+            $nextCursor = (int) min(array_column($items, 'source_score'));
+        } elseif ($mergedEntries !== []) {
             // Cursor hardening: progress pagination even when ranked entries contain stale/deleted posts.
-            $nextCursor = (int) end($rankedItems)['score'];
+            $nextCursor = (int) end($mergedEntries)['source_score'];
         }
 
         $feedItems = array_map(function (array $item): FeedItemData {
@@ -158,7 +170,7 @@ class GetUserFeedAction
     }
 
     /**
-     * @param array<int, array{post_id: string, score: int}> $rankedItems
+     * @param array<int, array{post_id: string, source_score: int}> $rankedItems
      * @return array<string, Post>
      */
     private function hydratePosts(array $rankedItems): array

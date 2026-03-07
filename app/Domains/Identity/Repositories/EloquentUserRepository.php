@@ -37,6 +37,11 @@ class EloquentUserRepository implements UserRepositoryInterface
         return $user->fresh();
     }
 
+    public function delete(User $user): void
+    {
+        $user->delete();
+    }
+
     public function existsByUsername(string $username): bool
     {
         return $this->model->whereRaw('LOWER(username) = ?', [strtolower($username)])->exists();

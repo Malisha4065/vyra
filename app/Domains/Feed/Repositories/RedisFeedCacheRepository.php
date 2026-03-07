@@ -93,6 +93,11 @@ class RedisFeedCacheRepository implements FeedCacheRepositoryInterface
         });
     }
 
+    public function clearUserFeed(string $userId): void
+    {
+        Redis::del(FeedKey::userFeed($userId));
+    }
+
     private function idempotencyKey(string $userId, string $postId): string
     {
         return "feed:idempotency:user:{$userId}:post:{$postId}";
