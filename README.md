@@ -90,6 +90,7 @@ npm run dev
 # Queue processing
 php artisan horizon
 php artisan ops:queue-health
+php artisan scout:sync-index-settings
 ```
 
 ## Feed Architecture
@@ -113,6 +114,16 @@ Horizon supervisors are split by workload:
 - `default`: everything else
 
 See [docs/queue-operations.md](docs/queue-operations.md) for queue priorities and worker guidance.
+
+The browser queue dashboard lives at `/ops/queues` and uses the same `viewHorizon` gate as Horizon itself. Outside `local`, set `HORIZON_ALLOWED_EMAILS` to the operator email allowlist.
+
+## Search Indexes
+
+Scout is configured with Meilisearch index settings for both `posts` and `users`. After changing ranking/filter/search settings, run:
+
+```bash
+php artisan scout:sync-index-settings
+```
 
 ## License
 

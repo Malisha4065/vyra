@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import UserAutocomplete from '@/Components/UserAutocomplete.vue';
 
 const props = defineProps({
     results: {
@@ -26,6 +27,7 @@ const props = defineProps({
 });
 
 const searchQuery = ref(props.query ?? '');
+const peopleQuery = ref('');
 
 const emptyLabel = computed(() => {
     if (props.hashtag) {
@@ -67,6 +69,11 @@ function submitSearch() {
 
     window.location.href = route('content.discover', query === '' ? {} : { query });
 }
+
+function openProfile(user) {
+    peopleQuery.value = '';
+    window.location.href = route('profile.show', { username: user.username });
+}
 </script>
 
 <template>
@@ -97,6 +104,23 @@ function submitSearch() {
                             Search
                         </button>
                     </form>
+
+                    <div class="border-t border-gray-200 px-6 py-5 dark:border-gray-800">
+                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                            Quick profile lookup
+                        </p>
+                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                            Search people directly without leaving discover.
+                        </p>
+                        <div class="mt-3">
+                            <UserAutocomplete
+                                v-model="peopleQuery"
+                                placeholder="Search users by username or name"
+                                empty-label="No matching profiles."
+                                @select="openProfile"
+                            />
+                        </div>
+                    </div>
                 </div>
 
                 <div v-if="results.length === 0" class="rounded-[2rem] border border-dashed border-gray-300 bg-white px-8 py-16 text-center dark:border-gray-700 dark:bg-gray-900">

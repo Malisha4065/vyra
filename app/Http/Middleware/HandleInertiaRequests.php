@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Domains\Notification\Repositories\UserNotificationRepositoryInterface;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -47,6 +48,11 @@ class HandleInertiaRequests extends Middleware
                 : [
                     'unread_count' => 0,
                 ],
+            'abilities' => fn (): array => [
+                'can_view_horizon' => $request->user()
+                    ? Gate::forUser($request->user())->allows('viewHorizon')
+                    : false,
+            ],
         ];
     }
 }

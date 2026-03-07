@@ -19,7 +19,60 @@ return [
     'meilisearch' => [
         'host' => env('MEILISEARCH_HOST', 'http://localhost:7700'),
         'key' => env('MEILISEARCH_KEY'),
-        'index-settings' => [],
+        'index-settings' => [
+            'posts' => [
+                'filterableAttributes' => [
+                    'user_id',
+                    'hashtags',
+                    'media_kinds',
+                ],
+                'sortableAttributes' => [
+                    'published_at',
+                    'comments_count',
+                    'reactions_count',
+                ],
+                'searchableAttributes' => [
+                    'body',
+                    'hashtags',
+                    'author_username',
+                ],
+                'rankingRules' => [
+                    'words',
+                    'typo',
+                    'proximity',
+                    'attribute',
+                    'sort',
+                    'exactness',
+                    'desc(reactions_count)',
+                    'desc(comments_count)',
+                    'desc(published_at)',
+                ],
+            ],
+            'users' => [
+                'filterableAttributes' => [
+                    'is_private',
+                    'location',
+                ],
+                'searchableAttributes' => [
+                    'username',
+                    'display_name',
+                    'bio',
+                    'location',
+                ],
+                'sortableAttributes' => [
+                    'username',
+                ],
+                'rankingRules' => [
+                    'words',
+                    'typo',
+                    'proximity',
+                    'attribute',
+                    'sort',
+                    'exactness',
+                    'asc(username)',
+                ],
+            ],
+        ],
     ],
     'typesense' => [
         'client-settings' => [

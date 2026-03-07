@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import UserAutocomplete from '@/Components/UserAutocomplete.vue';
 import { ensureEcho } from '@/lib/echo';
 
 const props = defineProps({
@@ -23,6 +24,7 @@ const conversations = ref([]);
 const messages = ref([]);
 const activeConversationId = ref(null);
 const composer = ref('');
+const conversationSearch = ref('');
 
 const loadingConversations = ref(false);
 const loadingMessages = ref(false);
@@ -489,6 +491,7 @@ async function startDirectConversation(targetUserId) {
         await loadConversations(false);
 
         activeConversationId.value = response.data?.data?.conversation_id ?? activeConversationId.value;
+        conversationSearch.value = '';
     } catch (error) {
         directConversationError.value = error?.response?.data?.message ?? 'Unable to start this conversation.';
     } finally {
@@ -573,6 +576,18 @@ onBeforeUnmount(async () => {
                     >
                         Starting...
                     </span>
+                </div>
+
+                <div class="mb-4">
+                    <p class="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                        New direct chat
+                    </p>
+                    <UserAutocomplete
+                        v-model="conversationSearch"
+                        placeholder="Search someone to message"
+                        empty-label="No users available to message."
+                        @select="startDirectConversation($event.id)"
+                    />
                 </div>
 
                 <p v-if="directConversationError" class="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/70 dark:bg-red-950/60 dark:text-red-300">

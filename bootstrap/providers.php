@@ -2,6 +2,7 @@
 
 return [
     App\Providers\AppServiceProvider::class,
+    App\Providers\OpsServiceProvider::class,
     App\Domains\Communication\CommunicationServiceProvider::class,
     App\Domains\Content\ContentServiceProvider::class,
     App\Domains\Feed\FeedServiceProvider::class,
