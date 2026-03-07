@@ -93,6 +93,28 @@ php artisan ops:queue-health
 php artisan scout:sync-index-settings
 ```
 
+## Production Notes
+
+- Product routes now require authenticated and verified users.
+- Leave only `verification`, `password reset`, and `logout` reachable for unverified accounts.
+- Use Redis for queues, cache, and sessions in production.
+- Use MinIO through Laravel's `s3` driver rather than changing storage adapters.
+
+Example production-oriented settings:
+
+```env
+APP_ENV=production
+APP_DEBUG=false
+QUEUE_CONNECTION=redis
+CACHE_STORE=redis
+SESSION_DRIVER=redis
+FILESYSTEM_DISK=s3
+MEDIA_DISK=s3
+AWS_ENDPOINT=http://minio:9000
+AWS_USE_PATH_STYLE_ENDPOINT=true
+SCOUT_DRIVER=meilisearch
+```
+
 ## Feed Architecture
 
 Vyra uses a **fan-out on write** strategy with a hybrid threshold:
@@ -116,6 +138,10 @@ Horizon supervisors are split by workload:
 See [docs/queue-operations.md](docs/queue-operations.md) for queue priorities and worker guidance.
 
 The browser queue dashboard lives at `/ops/queues` and uses the same `viewHorizon` gate as Horizon itself. Outside `local`, set `HORIZON_ALLOWED_EMAILS` to the operator email allowlist.
+
+## Launch Checklist
+
+See [docs/mvp-launch-checklist.md](docs/mvp-launch-checklist.md) for the MVP deployment and verification checklist.
 
 ## Search Indexes
 
